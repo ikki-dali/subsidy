@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubsidyCard } from '@/components/features/subsidy-card';
 import { Header } from '@/components/layout/header';
-import { Clock, TrendingUp, Sparkles, Percent } from 'lucide-react';
+import { Check, Clock, Percent, Sparkles, TrendingUp } from 'lucide-react';
 import type { Subsidy } from '@/types/database';
 
 type Category = 'all' | 'deadline' | 'popular' | 'new' | 'highrate';
@@ -20,6 +20,8 @@ const CATEGORIES: { id: Category; label: string; icon: React.ReactNode; descript
 
 export default function RecommendedPage() {
   const [category, setCategory] = useState<Category>('all');
+  // category=all のときだけ有効: 募集中のみ表示（デフォルトは募集終了も含む）
+  const [activeOnly, setActiveOnly] = useState(false);
   const [subsidies, setSubsidies] = useState<Subsidy[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +29,14 @@ export default function RecommendedPage() {
     const fetchRecommended = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/subsidies/recommended?category=${category}&limit=12`);
+        const params = new URLSearchParams({
+          category,
+          limit: '12',
+        });
+        if (category === 'all' && activeOnly) {
+          params.set('active', 'true');
+        }
+        const res = await fetch(`/api/subsidies/recommended?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
           setSubsidies(data.subsidies);
@@ -40,7 +49,7 @@ export default function RecommendedPage() {
     };
 
     fetchRecommended();
-  }, [category]);
+  }, [category, activeOnly]);
 
   const currentCategory = CATEGORIES.find(c => c.id === category);
 
@@ -64,16 +73,30 @@ export default function RecommendedPage() {
         {/* カテゴリタブ */}
         <div className="flex flex-wrap gap-2 mb-6">
           {CATEGORIES.map((cat) => (
-            <Button
-              key={cat.id}
-              variant={category === cat.id ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setCategory(cat.id)}
-              className="flex items-center gap-1"
-            >
-              {cat.icon}
-              {cat.label}
-            </Button>
+            <Fragment key={cat.id}>
+              <Button
+                variant={category === cat.id ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setCategory(cat.id)}
+                className="flex items-center gap-1"
+              >
+                {cat.icon}
+                {cat.label}
+              </Button>
+
+              {/* 「すべて」選択時のみ、募集終了を除外するトグルを表示 */}
+              {cat.id === 'all' && category === 'all' && (
+                <Button
+                  variant={activeOnly ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveOnly((v) => !v)}
+                  className={activeOnly ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                >
+                  <Check className={`h-4 w-4 mr-1 ${activeOnly ? 'text-white' : 'text-emerald-600'}`} />
+                  募集中
+                </Button>
+              )}
+            </Fragment>
           ))}
         </div>
 

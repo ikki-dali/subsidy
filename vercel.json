@@ -8,7 +8,7 @@
   ],
   "headers": [
     {
-      "source": "/favicon.ico",
+      "source": "/icon.ico",
       "headers": [
         {
           "key": "Cache-Control",
@@ -17,7 +17,7 @@
       ]
     },
     {
-      "source": "/favicon-32.png",
+      "source": "/icon-32.png",
       "headers": [
         {
           "key": "Cache-Control",

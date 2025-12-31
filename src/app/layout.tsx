@@ -29,10 +29,10 @@ export const metadata: Metadata = {
   creator: "補助金ナビ",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "32x32" },
-      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon.ico", sizes: "32x32" },
+      { url: "/icon-32.png", type: "image/png", sizes: "32x32" },
     ],
-    shortcut: "/favicon.ico",
+    shortcut: "/icon.ico",
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
