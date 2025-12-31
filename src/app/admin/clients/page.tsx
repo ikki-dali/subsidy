@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,10 +63,15 @@ export default function AdminClientsPage() {
   const [prefecture, setPrefecture] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const inFlightRef = useRef(false);
   const limit = 20;
 
-  const fetchClients = useCallback(async () => {
-    setLoading(true);
+  const fetchClients = useCallback(async (options?: { silent?: boolean }) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
+    const silent = options?.silent === true;
+    if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set('limit', limit.toString());
@@ -76,7 +81,7 @@ export default function AdminClientsPage() {
       params.set('sort', sortBy);
       params.set('order', sortOrder);
 
-      const res = await fetch(`/api/admin/clients?${params.toString()}`);
+      const res = await fetch(`/api/admin/clients?${params.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setClients(data.clients || []);
@@ -85,12 +90,23 @@ export default function AdminClientsPage() {
     } catch (error) {
       console.error('Failed to fetch clients:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      inFlightRef.current = false;
     }
   }, [page, search, prefecture, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchClients();
+  }, [fetchClients]);
+
+  useEffect(() => {
+    const AUTO_REFRESH_MS = 5000;
+    const intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      fetchClients({ silent: true });
+    }, AUTO_REFRESH_MS);
+
+    return () => clearInterval(intervalId);
   }, [fetchClients]);
 
   const handleSearch = () => {
@@ -134,7 +150,7 @@ export default function AdminClientsPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchClients}
+          onClick={() => fetchClients()}
           disabled={loading}
         >
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />

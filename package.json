@@ -40,6 +40,7 @@
     "check:ended:dry": "tsx scripts/check-ended.ts --dry-run",
     "notify:similar": "tsx scripts/notify-similar.ts",
     "notify:similar:dry": "tsx scripts/notify-similar.ts --dry-run",
+    "notify:favorites:hourly": "tsx scripts/notify-favorites-hourly.ts",
     "enrich:jgrants": "tsx scripts/enrich-jgrants.ts",
     "sync:weekly": "tsx scripts/weekly-sync.ts",
     "sync:official": "tsx scripts/add-official-subsidies.ts"

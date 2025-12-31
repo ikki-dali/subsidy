@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,10 +76,15 @@ export default function AdminInterestsPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const inFlightRef = useRef(false);
   const limit = 20;
 
-  const fetchInterests = useCallback(async () => {
-    setLoading(true);
+  const fetchInterests = useCallback(async (options?: { silent?: boolean }) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
+    const silent = options?.silent === true;
+    if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set('limit', limit.toString());
@@ -87,7 +92,7 @@ export default function AdminInterestsPage() {
       if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
       if (unreadOnly) params.set('unread', 'true');
 
-      const res = await fetch(`/api/admin/interests?${params.toString()}`);
+      const res = await fetch(`/api/admin/interests?${params.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setInterests(data.interests || []);
@@ -96,12 +101,23 @@ export default function AdminInterestsPage() {
     } catch (error) {
       console.error('Failed to fetch interests:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      inFlightRef.current = false;
     }
   }, [page, statusFilter, unreadOnly]);
 
   useEffect(() => {
     fetchInterests();
+  }, [fetchInterests]);
+
+  useEffect(() => {
+    const AUTO_REFRESH_MS = 5000;
+    const intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      fetchInterests({ silent: true });
+    }, AUTO_REFRESH_MS);
+
+    return () => clearInterval(intervalId);
   }, [fetchInterests]);
 
   const markAsRead = async (id: string) => {
@@ -184,7 +200,7 @@ export default function AdminInterestsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchInterests}
+            onClick={() => fetchInterests()}
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />

@@ -38,30 +38,47 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const AUTO_REFRESH_MS = 5000;
+    let cancelled = false;
+    let inFlight = false;
+
     async function fetchDashboardData() {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const [statsRes, interestsRes] = await Promise.all([
-          fetch('/api/admin/stats'),
-          fetch('/api/admin/interests?limit=5'),
+          fetch('/api/admin/stats', { cache: 'no-store' }),
+          fetch('/api/admin/interests?limit=5', { cache: 'no-store' }),
         ]);
 
         if (statsRes.ok) {
           const data = await statsRes.json();
-          setStats(data.stats);
+          if (!cancelled) setStats(data.stats);
         }
 
         if (interestsRes.ok) {
           const data = await interestsRes.json();
-          setRecentInterests(data.interests || []);
+          if (!cancelled) setRecentInterests(data.interests || []);
         }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
+        inFlight = false;
       }
     }
 
     fetchDashboardData();
+
+    const intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      fetchDashboardData();
+    }, AUTO_REFRESH_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, []);
 
   const formatDate = (dateStr: string) => {
