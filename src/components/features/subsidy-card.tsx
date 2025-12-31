@@ -189,9 +189,9 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
             const displayText = subsidy.catch_phrase || 
               (strippedDesc ? strippedDesc.slice(0, 80) + (strippedDesc.length > 80 ? '...' : '') : null);
             return displayText ? (
-              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                 {displayText}
-              </p>
+          </p>
             ) : null;
           })()}
         </div>
@@ -199,12 +199,12 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
         {/* 詳細情報 */}
         <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
           {/* 補助率 */}
-          <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-lg bg-slate-50">
-            <div className="p-1 sm:p-1.5 rounded bg-purple-100">
-              <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-purple-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-xs text-muted-foreground">補助率</p>
+            <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-lg bg-slate-50">
+              <div className="p-1 sm:p-1.5 rounded bg-purple-100">
+                <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-purple-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">補助率</p>
               <p className="font-semibold text-purple-700 truncate">{subsidy.subsidy_rate || '-'}</p>
             </div>
           </div>
@@ -240,8 +240,8 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
                   variant="outline" 
                   className="text-[10px] sm:text-xs py-0.5 cursor-pointer hover:bg-slate-100"
                 >
-                  +{subsidy.target_area.length - 1}
-                </Badge>
+              +{subsidy.target_area.length - 1}
+            </Badge>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-2" align="start">
                 <div className="text-xs font-medium text-slate-600 mb-2">対象地域</div>
@@ -266,11 +266,11 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
             return (
               <>
                 {displayIndustries.slice(0, visibleCount).map((ind, i) => (
-                  <Badge 
-                    key={i} 
-                    variant="outline" 
-                    className="text-[10px] sm:text-xs bg-orange-50 text-orange-700 border-orange-200 py-0.5"
-                  >
+            <Badge 
+              key={i} 
+              variant="outline" 
+              className="text-[10px] sm:text-xs bg-orange-50 text-orange-700 border-orange-200 py-0.5"
+            >
                     {ind.length > 8 ? ind.slice(0, 8) + '...' : ind}
                   </Badge>
                 ))}
@@ -294,8 +294,8 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
                             className="text-xs bg-orange-50 text-orange-700 border-orange-200"
                           >
                             {ind}
-                          </Badge>
-                        ))}
+            </Badge>
+          ))}
                       </div>
                     </PopoverContent>
                   </Popover>

@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- 虫眼鏡の円 -->
-  <circle cx="14" cy="14" r="12" stroke="#1d6bb3" stroke-width="2.5" fill="white"/>
+  <!-- 虫眼鏡の円（白背景） -->
+  <circle cx="13" cy="13" r="11" fill="white"/>
+  <circle cx="13" cy="13" r="11" stroke="#1d6bb3" stroke-width="3" fill="none"/>
   <!-- 虫眼鏡の柄 -->
-  <line x1="23" y1="23" x2="30" y2="30" stroke="#1d6bb3" stroke-width="3" stroke-linecap="round"/>
+  <line x1="21" y1="21" x2="30" y2="30" stroke="#1d6bb3" stroke-width="4" stroke-linecap="round"/>
   <!-- 「助」の文字 -->
-  <text x="14" y="18" font-size="12" font-weight="bold" fill="#1d6bb3" text-anchor="middle" font-family="Arial, sans-serif">助</text>
+  <text x="13" y="17" font-size="11" font-weight="bold" fill="#1d6bb3" text-anchor="middle" font-family="Arial, sans-serif">助</text>
 </svg>
-
