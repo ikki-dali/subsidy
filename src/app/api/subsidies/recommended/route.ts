@@ -1,14 +1,9 @@
 // おすすめ補助金取得API
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import type { Database, Subsidy } from '@/types/database';
+import { supabase } from '@/lib/supabase';
+import type { Subsidy } from '@/types/database';
 import { checkRateLimit, getRateLimitHeaders, getClientIp } from '@/lib/rate-limit';
-
-const supabase = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 function escapeForPostgrestJsonString(value: string): string {
   // `industry.cs.["..."]` に埋め込むため、JSON文字列として壊れないようにエスケープ

@@ -1,14 +1,8 @@
 // 補助金詳細取得API
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
+import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getRateLimitHeaders, getClientIp } from '@/lib/rate-limit';
-
-const supabase = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 type RouteParams = {
   params: Promise<{ id: string }>;

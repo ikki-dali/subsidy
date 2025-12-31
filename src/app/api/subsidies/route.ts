@@ -1,14 +1,8 @@
 // 補助金検索API（強化版）
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
+import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getRateLimitHeaders, getClientIp } from '@/lib/rate-limit';
-
-const supabase = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 function sanitizeOrFilterValue(value: string, maxLength = 100): string {
   // PostgREST の `or()` フィルタ文字列注入を避けるため、予約文字を除去

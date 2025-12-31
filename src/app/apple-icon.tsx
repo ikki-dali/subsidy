@@ -11,48 +11,53 @@ export default function AppleIcon() {
     (
       <div
         style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
           width: '100%',
           height: '100%',
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          background: 'white',
           borderRadius: 36,
+          position: 'relative',
         }}
       >
-        {/* コインのサークル */}
+        {/* 虫眼鏡の円 */}
         <div
           style={{
-            width: 100,
-            height: 100,
-            borderRadius: 50,
-            border: '6px solid white',
+            width: 120,
+            height: 120,
+            borderRadius: '50%',
+            border: '12px solid #1d6bb3',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 8,
+            position: 'absolute',
+            top: 15,
+            left: 15,
           }}
         >
           <span
             style={{
-              fontSize: 48,
+              fontSize: 55,
               fontWeight: 'bold',
-              color: 'white',
+              color: '#1d6bb3',
               fontFamily: 'sans-serif',
             }}
           >
-            ¥
+            助
           </span>
         </div>
-        {/* 下向き矢印 */}
+        {/* 虫眼鏡の柄 */}
         <div
           style={{
-            width: 0,
-            height: 0,
-            borderLeft: '16px solid transparent',
-            borderRight: '16px solid transparent',
-            borderTop: '20px solid white',
+            width: 50,
+            height: 18,
+            background: '#1d6bb3',
+            borderRadius: 9,
+            position: 'absolute',
+            bottom: 18,
+            right: 8,
+            transform: 'rotate(45deg)',
           }}
         />
       </div>
