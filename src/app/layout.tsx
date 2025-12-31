@@ -28,9 +28,12 @@ export const metadata: Metadata = {
   authors: [{ name: "補助金ナビ" }],
   creator: "補助金ナビ",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "補助金ナビ - あなたに最適な補助金を発見",
