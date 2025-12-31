@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +13,7 @@ import {
   TrendingUp, 
   Zap,
   Flame,
+  Check,
   MapPin,
   Briefcase,
 } from 'lucide-react';
@@ -66,6 +67,8 @@ export function RecommendedSection() {
   const [subsidies, setSubsidies] = useState<Subsidy[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
+  // category=all のときだけ有効: 募集中のみ表示（デフォルトは募集終了も含む）
+  const [activeOnly, setActiveOnly] = useState(false);
   const [userPrefecture, setUserPrefecture] = useState<string | null>(null);
   const [userIndustry, setUserIndustry] = useState<string | null>(null);
   const [cookiesLoaded, setCookiesLoaded] = useState(false);
@@ -93,6 +96,9 @@ export function RecommendedSection() {
           category: activeCategory,
           limit: '6',
         });
+        if (activeCategory === 'all' && activeOnly) {
+          params.set('active', 'true');
+        }
         if (userPrefecture) {
           params.set('area', userPrefecture);
         }
@@ -122,7 +128,7 @@ export function RecommendedSection() {
     return () => {
       abortController.abort();
     };
-  }, [activeCategory, userPrefecture, userIndustry, cookiesLoaded]);
+  }, [activeCategory, activeOnly, userPrefecture, userIndustry, cookiesLoaded]);
 
   if (!loading && subsidies.length === 0 && activeCategory === 'all') {
     return null;
@@ -173,21 +179,40 @@ export function RecommendedSection() {
           const Icon = cat.icon;
           const isActive = activeCategory === cat.id;
           return (
-            <Button
-              key={cat.id}
-              variant={isActive ? 'default' : 'outline'}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`
-                rounded-full h-11 px-5 text-sm transition-all
-                ${isActive 
-                  ? 'bg-slate-900 text-white' 
-                  : 'bg-white hover:bg-slate-50'
-                }
-              `}
-            >
-              <Icon className={`h-4 w-4 mr-1.5 ${isActive ? 'text-white' : cat.color}`} />
-              {cat.label}
-            </Button>
+            <Fragment key={cat.id}>
+              <Button
+                variant={isActive ? 'default' : 'outline'}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`
+                  rounded-full h-11 px-5 text-sm transition-all
+                  ${isActive 
+                    ? 'bg-slate-900 text-white' 
+                    : 'bg-white hover:bg-slate-50'
+                  }
+                `}
+              >
+                <Icon className={`h-4 w-4 mr-1.5 ${isActive ? 'text-white' : cat.color}`} />
+                {cat.label}
+              </Button>
+
+              {/* 「すべて」選択時のみ、募集終了を除外するトグルを表示 */}
+              {cat.id === 'all' && activeCategory === 'all' && (
+                <Button
+                  variant={activeOnly ? 'default' : 'outline'}
+                  onClick={() => setActiveOnly((v) => !v)}
+                  className={`
+                    rounded-full h-11 px-5 text-sm transition-all
+                    ${activeOnly
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      : 'bg-white hover:bg-slate-50'
+                    }
+                  `}
+                >
+                  <Check className={`h-4 w-4 mr-1.5 ${activeOnly ? 'text-white' : 'text-emerald-600'}`} />
+                  募集中
+                </Button>
+              )}
+            </Fragment>
           );
         })}
       </div>

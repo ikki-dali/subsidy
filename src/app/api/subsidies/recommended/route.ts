@@ -38,7 +38,7 @@ async function getSubsidies(
   ascending: boolean,
   extraFilter?: (query: ReturnType<typeof supabase.from>) => ReturnType<typeof supabase.from>,
   limit = 6,
-  onlyActive = true, // デフォルトで募集中のみ
+  onlyActive = true, // true: 募集中のみ / false: 募集終了も含む
   area?: string, // 地域フィルタ
   industry?: string // 業種フィルタ
 ): Promise<Subsidy[]> {
@@ -56,7 +56,6 @@ async function getSubsidies(
       let query = supabase
         .from('subsidies')
         .select('*')
-        .eq('is_active', true)
         .contains('target_area', [area]);
       
       // 業種フィルタ（JGSONBの配列内検索）
@@ -65,7 +64,11 @@ async function getSubsidies(
       query = query.or(industryVariants.map(v => `industry.cs.["${escapeForPostgrestJsonString(v)}"]`).join(','));
 
       if (onlyActive) {
+        query = query.eq('is_active', true);
         query = query.or(`end_date.is.null,end_date.gte.${now}`);
+      } else {
+        // 募集終了も含める場合は、募集中を先に表示
+        query = query.order('is_active', { ascending: false });
       }
       if (extraFilter) {
         query = extraFilter(query);
@@ -89,11 +92,13 @@ async function getSubsidies(
       let query = supabase
         .from('subsidies')
         .select('*')
-        .eq('is_active', true)
         .contains('target_area', [area]);
 
       if (onlyActive) {
+        query = query.eq('is_active', true);
         query = query.or(`end_date.is.null,end_date.gte.${now}`);
+      } else {
+        query = query.order('is_active', { ascending: false });
       }
       if (extraFilter) {
         query = extraFilter(query);
@@ -119,11 +124,13 @@ async function getSubsidies(
       let query = supabase
         .from('subsidies')
         .select('*')
-        .eq('is_active', true)
         .or(industryVariants.map(v => `industry.cs.["${escapeForPostgrestJsonString(v)}"]`).join(','));
 
       if (onlyActive) {
+        query = query.eq('is_active', true);
         query = query.or(`end_date.is.null,end_date.gte.${now}`);
+      } else {
+        query = query.order('is_active', { ascending: false });
       }
       if (extraFilter) {
         query = extraFilter(query);
@@ -148,11 +155,13 @@ async function getSubsidies(
       let query = supabase
         .from('subsidies')
         .select('*')
-        .eq('is_active', true)
         .contains('target_area', ['全国']);
 
       if (onlyActive) {
+        query = query.eq('is_active', true);
         query = query.or(`end_date.is.null,end_date.gte.${now}`);
+      } else {
+        query = query.order('is_active', { ascending: false });
       }
       if (extraFilter) {
         query = extraFilter(query);
@@ -174,11 +183,13 @@ async function getSubsidies(
   // フィルタ指定がない場合は従来通り
   let query = supabase
     .from('subsidies')
-    .select('*')
-    .eq('is_active', true);
+    .select('*');
 
   if (onlyActive) {
+    query = query.eq('is_active', true);
     query = query.or(`end_date.is.null,end_date.gte.${now}`);
+  } else {
+    query = query.order('is_active', { ascending: false });
   }
 
   if (extraFilter) {
@@ -198,6 +209,8 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get('limit') || '6', 10);
   const area = searchParams.get('area') || undefined;
   const industry = searchParams.get('industry') || undefined;
+  // category=all のときのみ有効: active=true で募集中のみ
+  const activeOnlyForAll = searchParams.get('active') === 'true';
 
   // Rate Limiting（公開API）
   const ip = getClientIp(request);
@@ -249,19 +262,38 @@ export async function GET(request: NextRequest) {
         break;
 
       default: // all: 各カテゴリから取得してマージ
-        const [deadline, popular, recent] = await Promise.all([
-          getSubsidies('end_date', true, undefined, 2, true, area, industry),
-          getSubsidies('max_amount', false, (q) => q.not('max_amount', 'is', null), 2, true, area, industry),
-          getSubsidies('created_at', false, undefined, 2, true, area, industry),
+        // デフォルトは「募集終了も含む」。ただし募集中ボタン押下（active=true）で募集中のみ。
+        // limitに応じて各カテゴリの比率を調整しつつ、募集終了分は後ろに回す。
+        const endedSlots = activeOnlyForAll ? 0 : Math.min(4, Math.floor(limit / 3));
+        const activeSlots = Math.max(0, limit - endedSlots);
+        const deadlineCount = Math.ceil(activeSlots / 3);
+        const popularCount = Math.ceil((activeSlots - deadlineCount) / 2);
+        const recentCount = Math.max(0, activeSlots - deadlineCount - popularCount);
+
+        const [deadline, popular, recent, ended] = await Promise.all([
+          deadlineCount > 0
+            ? getSubsidies('end_date', true, undefined, deadlineCount, true, area, industry)
+            : Promise.resolve([] as Subsidy[]),
+          popularCount > 0
+            ? getSubsidies('max_amount', false, (q) => q.not('max_amount', 'is', null), popularCount, true, area, industry)
+            : Promise.resolve([] as Subsidy[]),
+          recentCount > 0
+            ? getSubsidies('created_at', false, undefined, recentCount, true, area, industry)
+            : Promise.resolve([] as Subsidy[]),
+          endedSlots > 0
+            ? getSubsidies('updated_at', false, (q) => q.eq('is_active', false), endedSlots, false, area, industry)
+            : Promise.resolve([] as Subsidy[]),
         ]);
 
-        // 重複を除去
+        // 重複を除去（募集中→募集終了の順で並べる）
         const seen = new Set<string>();
-        subsidies = [...deadline, ...popular, ...recent].filter((item) => {
-          if (seen.has(item.id)) return false;
-          seen.add(item.id);
-          return true;
-        }).slice(0, limit);
+        subsidies = [...deadline, ...popular, ...recent, ...ended]
+          .filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          })
+          .slice(0, limit);
         break;
     }
 
@@ -270,6 +302,7 @@ export async function GET(request: NextRequest) {
       category,
       area,
       industry,
+      activeOnly: category === 'all' ? activeOnlyForAll : true,
     });
   } catch (e) {
     console.error('API error:', e);
