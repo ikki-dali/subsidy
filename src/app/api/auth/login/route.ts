@@ -23,6 +23,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (!process.env.JWT_SECRET) {
+      return NextResponse.json(
+        { error: 'サーバー設定が不足しています（JWT_SECRET）。管理者にお問い合わせください。' },
+        { status: 500, headers: getRateLimitHeaders(rateLimit) }
+      );
+    }
     const body = await request.json();
     const { email, password } = body;
 

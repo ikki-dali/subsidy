@@ -12,6 +12,11 @@ const PUBLIC_PATHS_EXACT = [
   '/forgot-password', // パスワードリセットリクエスト
   '/reset-password', // パスワードリセット実行
   '/admin/login', // 管理者ログインは公開
+  '/manifest.webmanifest', // PWA manifest は公開
+  '/icon', // Next.js icon route は公開
+  '/apple-icon', // Next.js apple icon route は公開
+  '/opengraph-image', // OG画像は公開
+  '/twitter-image', // Twitter画像は公開
 ];
 
 const PUBLIC_PATH_PREFIXES = [
@@ -144,6 +149,10 @@ export async function middleware(request: NextRequest) {
 
   // トークンがない場合
   if (!token) {
+    // APIの場合は401を返す（fetchがHTMLへリダイレクトしてJSONパースに失敗するのを防ぐ）
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/onboarding';
     return NextResponse.redirect(url);
@@ -154,6 +163,11 @@ export async function middleware(request: NextRequest) {
 
   if (!isValid) {
     // 無効なトークンの場合、Cookieを削除してオンボーディングへ
+    if (pathname.startsWith('/api/')) {
+      const response = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      response.cookies.delete('auth_token');
+      return response;
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/onboarding';
     const response = NextResponse.redirect(url);

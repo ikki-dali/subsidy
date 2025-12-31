@@ -301,10 +301,10 @@ export default function OnboardingPage() {
                     <SelectTrigger className="border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-blue-500">
                       <SelectValue placeholder="業種を選択" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200">
+                    <SelectContent className="bg-white border-slate-200 z-[100]">
                       {INDUSTRIES.map((ind) => (
-                        <SelectItem 
-                          key={ind.value} 
+                        <SelectItem
+                          key={ind.value}
                           value={ind.value}
                           className="text-slate-700 focus:bg-blue-50 focus:text-blue-700"
                         >
@@ -340,7 +340,7 @@ export default function OnboardingPage() {
                     <SelectTrigger className="border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-blue-500">
                       <SelectValue placeholder="従業員数を選択" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200">
+                    <SelectContent className="bg-white border-slate-200 z-[100]">
                       {EMPLOYEE_COUNTS.map((ec) => (
                         <SelectItem 
                           key={ec.value} 
@@ -362,7 +362,7 @@ export default function OnboardingPage() {
                     <SelectTrigger className="border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-blue-500">
                       <SelectValue placeholder="年商規模を選択" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200">
+                    <SelectContent className="bg-white border-slate-200 z-[100]">
                       {REVENUE_RANGES.map((rr) => (
                         <SelectItem 
                           key={rr.value} 
@@ -384,7 +384,7 @@ export default function OnboardingPage() {
                     <SelectTrigger className="border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-blue-500">
                       <SelectValue placeholder="都道府県を選択" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200 max-h-60">
+                    <SelectContent className="bg-white border-slate-200 max-h-60 z-[100]">
                       {PREFECTURES.map((pref) => (
                         <SelectItem 
                           key={pref} 

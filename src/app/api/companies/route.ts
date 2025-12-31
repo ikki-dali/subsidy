@@ -21,6 +21,15 @@ export async function POST(request: NextRequest) {
       }
     );
   }
+  
+  // JWT_SECRET がない状態で登録すると「DBに登録されたのにログインできない」状態になり得るため、
+  // 事前にチェックして早期に落とす（＝重複409の原因を作らない）
+  if (!process.env.JWT_SECRET) {
+    return NextResponse.json(
+      { error: 'サーバー設定が不足しています（JWT_SECRET）。管理者にお問い合わせください。' },
+      { status: 500, headers: getRateLimitHeaders(rateLimit) }
+    );
+  }
   try {
     const body = await request.json();
 
@@ -115,11 +124,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // JWTトークンを生成
-    const token = await createToken({
-      companyId: data.id,
-      companyName: data.name,
-    });
+    // JWTトークンを生成（失敗したら登録済みレコードを巻き戻す）
+    let token: string;
+    try {
+      token = await createToken({
+        companyId: data.id,
+        companyName: data.name,
+      });
+    } catch (e) {
+      console.error('Failed to create auth token after company insert:', e);
+      try {
+        await supabase.from('companies').delete().eq('id', data.id);
+      } catch (rollbackError) {
+        console.error('Failed to rollback company insert:', rollbackError);
+      }
+      return NextResponse.json(
+        { error: 'サーバー設定が不足しています。しばらくしてから再度お試しください。' },
+        { status: 500 }
+      );
+    }
 
     const response = NextResponse.json({ 
       success: true, 
