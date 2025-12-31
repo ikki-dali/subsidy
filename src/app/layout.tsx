@@ -27,6 +27,11 @@ export const metadata: Metadata = {
   keywords: ["補助金", "助成金", "支援金", "中小企業", "事業支援", "申請", "検索"],
   authors: [{ name: "補助金ナビ" }],
   creator: "補助金ナビ",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
   openGraph: {
     title: "補助金ナビ - あなたに最適な補助金を発見",
     description: "全国の補助金・助成金情報を一元検索。地域・業種・金額から、あなたに合った支援制度を見つけましょう。",
