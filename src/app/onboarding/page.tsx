@@ -526,6 +526,7 @@ export default function OnboardingPage() {
           <div className="mt-8 flex gap-3">
             {step > 1 && (
               <Button
+                type="button"
                 variant="outline"
                 onClick={handleBack}
                 className="flex-1 border-slate-300 text-slate-600 hover:bg-slate-100"
@@ -535,6 +536,7 @@ export default function OnboardingPage() {
             )}
             {step < 3 ? (
               <Button
+                type="button"
                 onClick={handleNext}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
               >
@@ -542,6 +544,7 @@ export default function OnboardingPage() {
               </Button>
             ) : (
               <Button
+                type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white disabled:opacity-50"
