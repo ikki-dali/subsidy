@@ -17,17 +17,36 @@ function escapeForPostgrestJsonString(value: string): string {
 // 業種名を正規化（表記揺れ対応）
 function normalizeIndustry(industry: string): string[] {
   const mapping: Record<string, string[]> = {
+    // Onboarding（コード値） -> DB/表示の揺れを吸収
+    manufacturing: ['製造業', '製造'],
+    construction: ['建設業', '建設'],
+    it: ['IT・情報通信', 'IT・情報通信業', 'IT・情報サービス業', '情報通信業', 'IT', '情報サービス業', 'ソフトウェア'],
+    retail: ['小売業', '商業', '卸売業・小売業'],
+    wholesale: ['卸売業', '卸売業・小売業'],
+    food: ['飲食業', '飲食', '飲食店', '宿泊業・飲食サービス業'],
+    hospitality: ['観光・宿泊', '宿泊業', 'ホテル', '旅館'],
+    transport: ['運輸・物流', '運輸業', '運輸', '運送業', '物流'],
+    real_estate: ['不動産業', '不動産'],
+    medical: ['医療・福祉', '医療', '福祉', 'ヘルスケア'],
+    education: ['教育・学習支援', '教育'],
+    agriculture: ['農林水産業', '農業', '林業', '水産業', '漁業'],
+    other: ['全業種', 'その他'],
+
     '製造業': ['製造業', '製造'],
-    '情報通信業': ['情報通信業', 'IT', '情報サービス業', 'ソフトウェア'],
+    // DBの業種タグ（scripts/tag-industries.ts）と揺れを吸収
+    'IT・情報通信': ['IT・情報通信', 'IT・情報通信業', 'IT・情報サービス業', '情報通信業', 'IT', '情報サービス業', 'ソフトウェア'],
+    '情報通信業': ['IT・情報通信', 'IT・情報通信業', 'IT・情報サービス業', '情報通信業', 'IT', '情報サービス業', 'ソフトウェア'],
     '卸売業・小売業': ['卸売業・小売業', '卸売業', '小売業', '商業'],
     '建設業': ['建設業', '建設'],
     'サービス業': ['サービス業', 'サービス'],
     '飲食業': ['飲食業', '飲食', '飲食店', '宿泊業・飲食サービス業'],
     '不動産業': ['不動産業', '不動産'],
-    '運輸業': ['運輸業', '運輸', '運送業'],
+    '運輸・物流': ['運輸・物流', '運輸業', '運輸', '運送業', '物流'],
+    '運輸業': ['運輸・物流', '運輸業', '運輸', '運送業', '物流'],
     '医療・福祉': ['医療・福祉', '医療', '福祉', 'ヘルスケア'],
     '農林水産業': ['農林水産業', '農業', '林業', '水産業', '漁業'],
     'その他': ['その他', '全業種'],
+    '全業種': ['全業種', 'その他'],
   };
   
   return mapping[industry] || [industry];
@@ -44,7 +63,7 @@ async function getSubsidies(
 ): Promise<Subsidy[]> {
   const now = new Date().toISOString();
   const hasAreaFilter = area && area !== '全国';
-  const hasIndustryFilter = industry && industry !== 'その他';
+  const hasIndustryFilter = industry && industry !== 'その他' && industry !== 'other';
   
   // フィルタが指定されている場合は、優先度付きで取得
   if (hasAreaFilter || hasIndustryFilter) {
@@ -229,6 +248,108 @@ export async function GET(request: NextRequest) {
     let subsidies: Subsidy[] = [];
 
     switch (category) {
+      case 'ai_dx': {
+        // 1) 手動ピン（募集終了も含む）を最優先で取得（パーソナライズはかけない＝全員に見せる）
+        const pinned = await getSubsidies(
+          'updated_at',
+          false,
+          (q) => q.eq('ai_dx_featured', true),
+          limit,
+          false,
+          undefined,
+          undefined
+        );
+
+        const remaining = Math.max(0, limit - pinned.length);
+        if (remaining === 0) {
+          subsidies = pinned.slice(0, limit);
+          break;
+        }
+
+        // 2) 自動判定（募集中のみ）で残りを補完
+        // AI/IT/DX系キーワード（効率化・省力化系も含む）
+        const AI_DX_KEYWORDS = [
+          // AI系
+          'AI',
+          '人工知能',
+          '生成AI',
+          'ChatGPT',
+          '機械学習',
+          // DX・デジタル系
+          'DX',
+          'IT導入',
+          'IT補助',
+          'ICT',
+          'デジタル化',
+          'デジタルトランスフォーメーション',
+          // 効率化・省力化系
+          '効率化',
+          '省力化',
+          '省人化',
+          '自動化',
+          '業務改善',
+          // ツール・サービス系
+          'RPA',
+          'クラウド',
+          'SaaS',
+          'サイバーセキュリティ',
+          'IoT',
+          'OCR',
+          'チャットボット',
+          'ロボット',
+          // 働き方系
+          'テレワーク',
+          'リモートワーク',
+          'BCP',
+          // Web系
+          'EC構築',
+          'ホームページ',
+          'Webサイト',
+          'ECサイト',
+          // システム系
+          'システム導入',
+          'システム構築',
+          '基幹システム',
+          '情報システム',
+        ] as const;
+
+        // タイトルとキャッチフレーズのみで判定（業種タグは全業種向け補助金で誤マッチするため除外）
+        const keywordFilters = AI_DX_KEYWORDS.flatMap((kw) => [
+          `title.ilike.%${kw}%`,
+          `catch_phrase.ilike.%${kw}%`,
+        ]);
+
+        const orFilter = keywordFilters.join(',');
+        const excludeIds = pinned.map((s) => s.id);
+
+        const auto = await getSubsidies(
+          'end_date',
+          true,
+          (q) => {
+            let qq = q.or(orFilter);
+            if (excludeIds.length > 0) {
+              qq = qq.not('id', 'in', `(${excludeIds.join(',')})`);
+            }
+            return qq;
+          },
+          remaining,
+          true,
+          area,
+          industry
+        );
+
+        // 重複を除去（ピン→自動の順で並べる）
+        const seen = new Set<string>();
+        subsidies = [...pinned, ...auto]
+          .filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          })
+          .slice(0, limit);
+        break;
+      }
+
       case 'deadline': // 締切間近
         subsidies = await getSubsidies('end_date', true, undefined, limit, true, area, industry);
         break;
@@ -261,40 +382,75 @@ export async function GET(request: NextRequest) {
         );
         break;
 
-      default: // all: 各カテゴリから取得してマージ
-        // デフォルトは「募集終了も含む」。ただし募集中ボタン押下（active=true）で募集中のみ。
-        // limitに応じて各カテゴリの比率を調整しつつ、募集終了分は後ろに回す。
-        const endedSlots = activeOnlyForAll ? 0 : Math.min(4, Math.floor(limit / 3));
-        const activeSlots = Math.max(0, limit - endedSlots);
-        const deadlineCount = Math.ceil(activeSlots / 3);
-        const popularCount = Math.ceil((activeSlots - deadlineCount) / 2);
-        const recentCount = Math.max(0, activeSlots - deadlineCount - popularCount);
+      default: { // all: AI/IT/DX優先 + 各カテゴリから取得してマージ
+        // AI/IT/DX系を常に上位に出す（サイトのコンセプト）
+        // タイトルとキャッチフレーズのキーワードのみで判定（業種タグは全業種向け補助金で誤マッチするため除外）
+        const AI_DX_KEYWORDS_ALL = [
+          // AI系
+          'AI', '人工知能', '生成AI', 'ChatGPT', '機械学習',
+          // DX・デジタル系
+          'DX', 'IT導入', 'IT補助', 'ICT', 'デジタル化', 'デジタルトランスフォーメーション',
+          // 効率化・省力化系
+          '効率化', '省力化', '省人化', '自動化', '業務改善',
+          // ツール・サービス系
+          'RPA', 'クラウド', 'SaaS', 'サイバーセキュリティ', 'IoT', 'OCR', 'チャットボット', 'ロボット',
+          // 働き方系
+          'テレワーク', 'リモートワーク', 'BCP',
+          // Web系
+          'EC構築', 'ホームページ', 'Webサイト', 'ECサイト',
+          // システム系
+          'システム導入', 'システム構築', '基幹システム', '情報システム',
+        ];
+        const keywordFiltersAll = AI_DX_KEYWORDS_ALL.flatMap((kw) => [
+          `title.ilike.%${kw}%`,
+          `catch_phrase.ilike.%${kw}%`,
+        ]);
+        const orFilterAll = keywordFiltersAll.join(',');
 
-        const [deadline, popular, recent, ended] = await Promise.all([
+        // まずAI/IT/DX系を優先取得（最大半分）
+        const aiDxCount = Math.ceil(limit / 2);
+        const aiDxSubsidies = await getSubsidies(
+          'end_date',
+          true,
+          (q) => q.or(orFilterAll),
+          aiDxCount,
+          true,
+          area,
+          industry
+        );
+
+        const seenAll = new Set<string>(aiDxSubsidies.map(s => s.id));
+        const remainingAll = Math.max(0, limit - aiDxSubsidies.length);
+
+        // 残りを締切間近・新着で補完
+        const endedSlots = activeOnlyForAll ? 0 : Math.min(2, Math.floor(remainingAll / 3));
+        const activeSlots = Math.max(0, remainingAll - endedSlots);
+        const deadlineCount = Math.ceil(activeSlots / 2);
+        const recentCount = Math.max(0, activeSlots - deadlineCount);
+
+        const excludeIdsAll = [...seenAll];
+        const [deadline, recent, ended] = await Promise.all([
           deadlineCount > 0
-            ? getSubsidies('end_date', true, undefined, deadlineCount, true, area, industry)
-            : Promise.resolve([] as Subsidy[]),
-          popularCount > 0
-            ? getSubsidies('max_amount', false, (q) => q.not('max_amount', 'is', null), popularCount, true, area, industry)
+            ? getSubsidies('end_date', true, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, deadlineCount, true, area, industry)
             : Promise.resolve([] as Subsidy[]),
           recentCount > 0
-            ? getSubsidies('created_at', false, undefined, recentCount, true, area, industry)
+            ? getSubsidies('created_at', false, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, recentCount, true, area, industry)
             : Promise.resolve([] as Subsidy[]),
           endedSlots > 0
-            ? getSubsidies('updated_at', false, (q) => q.eq('is_active', false), endedSlots, false, area, industry)
+            ? getSubsidies('updated_at', false, excludeIdsAll.length > 0 ? (q) => q.eq('is_active', false).not('id', 'in', `(${excludeIdsAll.join(',')})`) : (q) => q.eq('is_active', false), endedSlots, false, area, industry)
             : Promise.resolve([] as Subsidy[]),
         ]);
 
-        // 重複を除去（募集中→募集終了の順で並べる）
-        const seen = new Set<string>();
-        subsidies = [...deadline, ...popular, ...recent, ...ended]
-          .filter((item) => {
-            if (seen.has(item.id)) return false;
-            seen.add(item.id);
-            return true;
-          })
-          .slice(0, limit);
+        // 重複を除去（AI/IT/DX優先→締切間近→新着→募集終了の順で並べる）
+        for (const item of [...deadline, ...recent, ...ended]) {
+          if (!seenAll.has(item.id)) {
+            seenAll.add(item.id);
+            aiDxSubsidies.push(item);
+          }
+        }
+        subsidies = aiDxSubsidies.slice(0, limit);
         break;
+      }
     }
 
     return NextResponse.json({

@@ -11,6 +11,7 @@ import {
   ArrowRight, 
   Clock, 
   TrendingUp, 
+  Cpu,
   Zap,
   Flame,
   Check,
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import type { Subsidy } from '@/types/database';
 
-type Category = 'all' | 'deadline' | 'popular' | 'new';
+type Category = 'ai_dx' | 'all' | 'deadline' | 'popular' | 'new';
 
 // Cookieから値を取得するヘルパー関数
 function getCookie(name: string): string | null {
@@ -57,6 +58,7 @@ function getIndustryLabel(code: string): string {
 }
 
 const categories = [
+  { id: 'ai_dx' as const, label: 'AI・IT・DX', icon: Cpu, color: 'text-indigo-600' },
   { id: 'all' as const, label: 'すべて', icon: Sparkles, color: 'text-yellow-500' },
   { id: 'deadline' as const, label: '締切間近', icon: Clock, color: 'text-red-500' },
   { id: 'popular' as const, label: '人気', icon: Flame, color: 'text-orange-500' },
@@ -66,7 +68,7 @@ const categories = [
 export function RecommendedSection() {
   const [subsidies, setSubsidies] = useState<Subsidy[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<Category>('all');
+  const [activeCategory, setActiveCategory] = useState<Category>('ai_dx');
   // category=all のときだけ有効: 募集中のみ表示（デフォルトは募集終了も含む）
   const [activeOnly, setActiveOnly] = useState(false);
   const [userPrefecture, setUserPrefecture] = useState<string | null>(null);
@@ -111,7 +113,13 @@ export function RecommendedSection() {
         });
         if (res.ok) {
           const data = await res.json();
-          setSubsidies(data.subsidies);
+          const fetched: Subsidy[] = data.subsidies || [];
+          // AI・IT・DXタブが0件なら、ユーザー体験優先で「すべて」にフォールバック
+          if (activeCategory === 'ai_dx' && fetched.length === 0) {
+            setActiveCategory('all');
+            return;
+          }
+          setSubsidies(fetched);
         }
       } catch (e) {
         if (e instanceof Error && e.name === 'AbortError') {

@@ -43,7 +43,7 @@ export async function PATCH(
     const body = await request.json();
 
     // 更新可能なフィールド
-    const allowedFields = ['max_amount', 'subsidy_rate', 'is_active', 'title', 'description', 'catch_phrase'];
+    const allowedFields = ['max_amount', 'subsidy_rate', 'is_active', 'ai_dx_featured', 'title', 'description', 'catch_phrase'];
     const updateData: Record<string, unknown> = {};
 
     for (const field of allowedFields) {
@@ -60,7 +60,7 @@ export async function PATCH(
             }
             updateData[field] = numValue;
           }
-        } else if (field === 'is_active') {
+        } else if (field === 'is_active' || field === 'ai_dx_featured') {
           updateData[field] = Boolean(body[field]);
         } else {
           updateData[field] = body[field];

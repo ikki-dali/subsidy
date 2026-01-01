@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubsidyCard } from '@/components/features/subsidy-card';
 import { Header } from '@/components/layout/header';
-import { Check, Clock, Percent, Sparkles, TrendingUp } from 'lucide-react';
+import { Check, Clock, Cpu, Percent, Sparkles, TrendingUp } from 'lucide-react';
 import type { Subsidy } from '@/types/database';
 
-type Category = 'all' | 'deadline' | 'popular' | 'new' | 'highrate';
+type Category = 'ai_dx' | 'all' | 'deadline' | 'popular' | 'new' | 'highrate';
 
 const CATEGORIES: { id: Category; label: string; icon: React.ReactNode; description: string }[] = [
+  { id: 'ai_dx', label: 'AI・IT・DX', icon: <Cpu className="h-4 w-4" />, description: 'AI/IT/DX関連の補助金をピックアップ' },
   { id: 'all', label: 'すべて', icon: <Sparkles className="h-4 w-4" />, description: '各カテゴリからピックアップ' },
   { id: 'deadline', label: '締切間近', icon: <Clock className="h-4 w-4" />, description: '申請期限が近い補助金' },
   { id: 'popular', label: '高額補助', icon: <TrendingUp className="h-4 w-4" />, description: '補助上限額が大きい補助金' },
@@ -19,7 +20,7 @@ const CATEGORIES: { id: Category; label: string; icon: React.ReactNode; descript
 ];
 
 export default function RecommendedPage() {
-  const [category, setCategory] = useState<Category>('all');
+  const [category, setCategory] = useState<Category>('ai_dx');
   // category=all のときだけ有効: 募集中のみ表示（デフォルトは募集終了も含む）
   const [activeOnly, setActiveOnly] = useState(false);
   const [subsidies, setSubsidies] = useState<Subsidy[]>([]);

@@ -35,11 +35,20 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+// UUIDかどうかを判定
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 async function getSubsidy(id: string): Promise<Subsidy | null> {
+  // UUIDならidで検索、そうでなければjgrants_idで検索
+  const column = isUUID(id) ? 'id' : 'jgrants_id';
+  
   const { data, error } = await supabaseAdmin
     .from('subsidies')
     .select('*')
-    .eq('id', id)
+    .eq(column, id)
     .single();
 
   if (error || !data) {
@@ -115,9 +124,9 @@ export default async function SubsidyDetailPage({ params }: Props) {
     });
   };
 
-  // 金額を読みやすく表示
+  // 金額を読みやすく表示（負の値や0は表示しない）
   const formatAmountDisplay = (amount: number | null | undefined) => {
-    if (!amount) return null;
+    if (!amount || amount <= 0) return null;
     if (amount >= 100000000) {
       return { value: (amount / 100000000).toFixed(1), unit: '億円' };
     } else if (amount >= 10000) {

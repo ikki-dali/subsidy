@@ -27,6 +27,7 @@ type Subsidy = {
   max_amount: number | null;
   subsidy_rate: string | null;
   is_active: boolean;
+  ai_dx_featured?: boolean;
   start_date: string | null;
   end_date: string | null;
   official_url: string | null;
@@ -51,6 +52,7 @@ export default function AdminSubsidyEditPage() {
   const [maxAmount, setMaxAmount] = useState('');
   const [subsidyRate, setSubsidyRate] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [aiDxFeatured, setAiDxFeatured] = useState(false);
   const [title, setTitle] = useState('');
   const [catchPhrase, setCatchPhrase] = useState('');
 
@@ -65,6 +67,7 @@ export default function AdminSubsidyEditPage() {
           setMaxAmount(s.max_amount ? s.max_amount.toLocaleString() : '');
           setSubsidyRate(s.subsidy_rate || '');
           setIsActive(s.is_active);
+          setAiDxFeatured(Boolean(s.ai_dx_featured));
           setTitle(s.title || '');
           setCatchPhrase(s.catch_phrase || '');
         }
@@ -105,6 +108,7 @@ export default function AdminSubsidyEditPage() {
           max_amount: parsedAmount,
           subsidy_rate: subsidyRate || null,
           is_active: isActive,
+          ai_dx_featured: aiDxFeatured,
           title,
           catch_phrase: catchPhrase || null,
         }),
@@ -305,6 +309,22 @@ export default function AdminSubsidyEditPage() {
             <Label htmlFor="isActive" className="cursor-pointer">
               募集中
             </Label>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div className="min-w-0">
+              <Label htmlFor="aiDxFeatured" className="cursor-pointer font-medium">
+                AI・IT・DX特集にピン留め
+              </Label>
+              <p className="text-xs text-slate-500 mt-1">
+                おすすめの「AI・IT・DX」枠に優先表示します（募集終了でも表示可）。
+              </p>
+            </div>
+            <Switch
+              id="aiDxFeatured"
+              checked={aiDxFeatured}
+              onCheckedChange={setAiDxFeatured}
+            />
           </div>
 
           <div className="flex gap-3 pt-4 border-t">

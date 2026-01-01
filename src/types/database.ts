@@ -33,6 +33,7 @@ export interface Database {
           front_url: string | null;
           required_documents: string[] | null;
           is_active: boolean;
+          ai_dx_featured: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -57,6 +58,7 @@ export interface Database {
           front_url?: string | null;
           required_documents?: string[] | null;
           is_active?: boolean;
+          ai_dx_featured?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -81,6 +83,7 @@ export interface Database {
           front_url?: string | null;
           required_documents?: string[] | null;
           is_active?: boolean;
+          ai_dx_featured?: boolean;
           created_at?: string;
           updated_at?: string;
         };

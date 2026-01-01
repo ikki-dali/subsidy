@@ -75,9 +75,9 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
 
   const config = statusConfig[status];
 
-  // 金額を視覚的に表示
+  // 金額を視覚的に表示（負の値や0は表示しない）
   const formatAmountDisplay = (amount: number | null | undefined) => {
-    if (!amount) return null;
+    if (!amount || amount <= 0) return null;
     
     if (amount >= 100000000) {
       return { value: (amount / 100000000).toFixed(1), unit: '億円' };
