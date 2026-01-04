@@ -194,6 +194,12 @@ export interface Database {
           email: string;
           phone: string | null;
           invited_by: string | null;
+          subsidy_experience: string | null;
+          subsidy_purposes: string[] | null;
+          subsidy_purpose_other: string | null;
+          current_challenges: string[] | null;
+          challenge_other: string | null;
+          lead_score: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -208,6 +214,12 @@ export interface Database {
           email: string;
           phone?: string | null;
           invited_by?: string | null;
+          subsidy_experience?: string | null;
+          subsidy_purposes?: string[] | null;
+          subsidy_purpose_other?: string | null;
+          current_challenges?: string[] | null;
+          challenge_other?: string | null;
+          lead_score?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -222,6 +234,12 @@ export interface Database {
           email?: string;
           phone?: string | null;
           invited_by?: string | null;
+          subsidy_experience?: string | null;
+          subsidy_purposes?: string[] | null;
+          subsidy_purpose_other?: string | null;
+          current_challenges?: string[] | null;
+          challenge_other?: string | null;
+          lead_score?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -477,4 +495,17 @@ export type DeadlineAlertHistory = {
   days_before: number;
   sent_at: string;
   email_id: string | null;
+};
+
+// 招待関連の型
+export type Invitation = {
+  id: string;
+  code: string;
+  inviter_company_id: string;
+  invited_email: string | null;
+  status: 'pending' | 'used' | 'expired' | 'cancelled';
+  used_by_company_id: string | null;
+  expires_at: string;
+  created_at: string;
+  used_at: string | null;
 };

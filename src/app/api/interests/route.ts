@@ -6,6 +6,7 @@ import { checkRateLimit, getRateLimitHeaders, getClientIp } from '@/lib/rate-lim
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;
+const appBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
 
 /**
  * Slackメッセージ用にテキストをサニタイズ
@@ -19,6 +20,19 @@ function sanitizeForSlack(text: string): string {
     .slice(0, 1000); // 最大1000文字
 }
 
+function sanitizeUrlForSlack(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return undefined;
+    }
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Slack通知を送信
  */
@@ -26,6 +40,7 @@ async function sendSlackNotification(data: {
   companyName: string;
   contactName: string;
   email: string;
+  phone?: string;
   subsidyTitle: string;
   subsidyUrl: string;
   note?: string;
@@ -41,9 +56,11 @@ async function sendSlackNotification(data: {
     companyName: sanitizeForSlack(data.companyName),
     contactName: sanitizeForSlack(data.contactName),
     email: sanitizeForSlack(data.email),
+    phone: data.phone ? sanitizeForSlack(data.phone) : undefined,
     subsidyTitle: sanitizeForSlack(data.subsidyTitle),
     note: data.note ? sanitizeForSlack(data.note) : undefined,
   };
+  const safeUrl = sanitizeUrlForSlack(data.subsidyUrl) || (appBaseUrl ? `${appBaseUrl}/` : '/');
 
   const isNotifySimilar = data.type === 'notify_similar';
   const headerText = isNotifySimilar 
@@ -80,6 +97,10 @@ async function sendSlackNotification(data: {
             type: 'mrkdwn',
             text: `*メールアドレス*\n${sanitized.email}`,
           },
+          {
+            type: 'mrkdwn',
+            text: `*電話番号*\n${sanitized.phone || '未登録'}`,
+          },
         ],
       },
       {
@@ -89,7 +110,7 @@ async function sendSlackNotification(data: {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*興味のある補助金*\n<${data.subsidyUrl}|${sanitized.subsidyTitle}>`,
+          text: `*興味のある補助金*\n<${safeUrl}|${sanitized.subsidyTitle}>`,
         },
       },
       ...(sanitized.note
@@ -153,6 +174,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { subsidyId, subsidyTitle, subsidyUrl, note, type = 'interested' } = body;
+    const safeSubsidyUrl =
+      sanitizeUrlForSlack(subsidyUrl) ||
+      (appBaseUrl ? `${appBaseUrl}/subsidies/${subsidyId}` : undefined);
 
     // JWTトークンから会社IDを取得
     const token = request.cookies.get('auth_token')?.value;
@@ -185,7 +209,7 @@ export async function POST(request: NextRequest) {
     // 会社情報を取得
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select('name, contact_name, email')
+      .select('name, contact_name, email, phone')
       .eq('id', companyId)
       .single();
 
@@ -228,8 +252,9 @@ export async function POST(request: NextRequest) {
       companyName: company.name,
       contactName: company.contact_name,
       email: company.email,
+      phone: company.phone,
       subsidyTitle,
-      subsidyUrl: subsidyUrl || `${process.env.NEXT_PUBLIC_BASE_URL || ''}/subsidies/${subsidyId}`,
+      subsidyUrl: safeSubsidyUrl || '',
       note,
       type: status as 'interested' | 'notify_similar',
     });

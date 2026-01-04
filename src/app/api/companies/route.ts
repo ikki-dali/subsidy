@@ -43,12 +43,41 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       password,
+      // Step 3: 補助金ニーズ
+      subsidyExperience,
+      subsidyPurposes,
+      subsidyPurposeOther,
+      // Step 4: 課題
+      currentChallenges,
+      challengeOther,
+      // 招待コード
+      inviteCode,
     } = body;
 
     // バリデーション
     if (!companyName || !industry || !employeeCount || !annualRevenue || !prefecture || !contactName || !email || !phone || !password) {
       return NextResponse.json(
         { error: '必須項目が入力されていません' },
+        { status: 400 }
+      );
+    }
+
+    // Step 3 & 4 のバリデーション（必須）
+    if (!subsidyExperience) {
+      return NextResponse.json(
+        { error: '補助金の利用経験を選択してください' },
+        { status: 400 }
+      );
+    }
+    if (!subsidyPurposes || !Array.isArray(subsidyPurposes) || subsidyPurposes.length === 0) {
+      return NextResponse.json(
+        { error: '補助金の利用用途を1つ以上選択してください' },
+        { status: 400 }
+      );
+    }
+    if (!currentChallenges || !Array.isArray(currentChallenges) || currentChallenges.length === 0) {
+      return NextResponse.json(
+        { error: '現在の課題を1つ以上選択してください' },
         { status: 400 }
       );
     }
@@ -87,12 +116,43 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
+    // リードスコア計算
+    let leadScore = 0;
+
+    // 補助金経験スコア
+    if (subsidyExperience === 'experienced_many') leadScore += 20;
+    else if (subsidyExperience === 'experienced_few') leadScore += 10;
+
+    // 用途スコア
+    if (subsidyPurposes.includes('it_dx')) leadScore += 30;
+    if (subsidyPurposes.includes('equipment')) leadScore += 10;
+    if (subsidyPurposes.includes('new_business')) leadScore += 10;
+
+    // 課題スコア
+    if (currentChallenges.includes('efficiency')) leadScore += 20;
+    if (currentChallenges.includes('digitalization')) leadScore += 20;
+    if (currentChallenges.includes('labor_shortage')) leadScore += 10;
+    if (currentChallenges.includes('productivity')) leadScore += 10;
+
     // Supabaseクライアント作成（サービスロールキー使用）
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 招待コードの検証と招待元会社ID取得
+    let invitedBy: string | null = null;
+    if (inviteCode) {
+      const { data: invitation } = await supabase
+        .from('invitations')
+        .select('inviter_company_id')
+        .eq('code', inviteCode)
+        .eq('status', 'pending')
+        .single();
+
+      if (invitation) {
+        invitedBy = invitation.inviter_company_id;
+      }
+    }
+
     // 会社情報を登録
-    // NOTE: phoneカラムはDBに追加が必要
-    // ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone TEXT;
     const { data, error } = await supabase
       .from('companies')
       .insert({
@@ -105,6 +165,17 @@ export async function POST(request: NextRequest) {
         email: normalizedEmail,
         phone,
         password_hash: passwordHash,
+        // Step 3: 補助金ニーズ
+        subsidy_experience: subsidyExperience,
+        subsidy_purposes: subsidyPurposes,
+        subsidy_purpose_other: subsidyPurposeOther || null,
+        // Step 4: 課題
+        current_challenges: currentChallenges,
+        challenge_other: challengeOther || null,
+        // リードスコア
+        lead_score: leadScore,
+        // 招待元
+        invited_by: invitedBy,
       })
       .select()
       .single();
@@ -122,6 +193,18 @@ export async function POST(request: NextRequest) {
         { error: '登録に失敗しました' },
         { status: 500 }
       );
+    }
+
+    // 招待コードを使用済みに更新
+    if (inviteCode && invitedBy) {
+      await supabase
+        .from('invitations')
+        .update({
+          status: 'used',
+          used_by_company_id: data.id,
+          used_at: new Date().toISOString(),
+        })
+        .eq('code', inviteCode);
     }
 
     // JWTトークンを生成（失敗したら登録済みレコードを巻き戻す）

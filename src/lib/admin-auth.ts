@@ -4,6 +4,7 @@
 
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
+import type { NextRequest } from 'next/server';
 
 // JWT署名用のシークレットキー
 const getJwtSecret = () => {
@@ -104,6 +105,15 @@ export async function getAdminIdFromToken(token: string | undefined): Promise<st
   
   const payload = await verifyAdminToken(token);
   return payload?.adminId || null;
+}
+
+/**
+ * リクエストからadminトークンを検証してペイロードを取得
+ */
+export async function getAdminFromRequest(request: NextRequest): Promise<AdminTokenPayload | null> {
+  const token = request.cookies.get('admin_token')?.value;
+  if (!token) return null;
+  return verifyAdminToken(token);
 }
 
 /**

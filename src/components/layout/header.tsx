@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Banknote } from 'lucide-react';
+import { Banknote, UserPlus } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/recommended', label: 'おすすめ' },
@@ -45,7 +45,27 @@ export function Header() {
               {item.label}
             </Link>
           ))}
+          <Link
+            href="/invite"
+            className={`ml-2 p-2 rounded-full transition-colors ${
+              isActive('/invite')
+                ? 'text-blue-600 bg-blue-50'
+                : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
+            }`}
+            title="友達を招待"
+          >
+            <UserPlus className="h-5 w-5" />
+          </Link>
         </nav>
+        
+        {/* モバイル用招待ボタン */}
+        <Link
+          href="/invite"
+          className="md:hidden p-2 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+          title="友達を招待"
+        >
+          <UserPlus className="h-5 w-5" />
+        </Link>
       </div>
     </header>
   );

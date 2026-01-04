@@ -1,18 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Building2, Users, Mail, ArrowRight, CheckCircle2, Banknote } from 'lucide-react';
+import { Building2, Users, Mail, ArrowRight, CheckCircle2, Banknote, Gift, Loader2, Lightbulb, HelpCircle } from 'lucide-react';
 
 // 業種選択肢
 const INDUSTRIES = [
@@ -62,21 +62,91 @@ const PREFECTURES = [
   '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
 ];
 
-type Step = 1 | 2 | 3;
+// 補助金利用経験
+const SUBSIDY_EXPERIENCES = [
+  { value: 'experienced_many', label: 'ある（何度も利用している）', description: 'IT導入補助金、ものづくり補助金など複数回申請経験がある' },
+  { value: 'experienced_few', label: 'ある（1-2回利用したことがある）', description: '過去に1-2回程度申請したことがある' },
+  { value: 'inexperienced_interested', label: 'ない（申請したいが方法がわからない）', description: '補助金に興味はあるが、どう申請すればいいかわからない' },
+  { value: 'inexperienced_not_interested', label: 'ない（興味がない/必要を感じていない）', description: '今のところ補助金の必要性を感じていない' },
+];
 
-export default function OnboardingPage() {
+// 補助金利用用途
+const SUBSIDY_PURPOSES = [
+  { value: 'it_dx', label: 'IT導入・DX推進', description: '業務システム導入、AI活用、クラウド化、ホームページ制作など' },
+  { value: 'equipment', label: '設備投資・機械導入', description: '生産設備、工作機械、店舗設備、車両など' },
+  { value: 'new_business', label: '新規事業・事業拡大', description: '新商品開発、新サービス、新分野進出など' },
+  { value: 'training', label: '人材育成・研修', description: '社員研修、資格取得支援、スキルアップなど' },
+  { value: 'marketing', label: '販路開拓・マーケティング', description: '展示会出展、広告宣伝、EC構築、海外展開など' },
+  { value: 'eco', label: '省エネ・環境対策', description: '太陽光発電導入、LED化、廃棄物削減、CO2削減など' },
+  { value: 'succession', label: '事業承継・M&A', description: '後継者育成、株式譲渡、事業売却・買収など' },
+  { value: 'other', label: 'その他', description: '' },
+];
+
+// 現在の課題
+const CURRENT_CHALLENGES = [
+  { value: 'efficiency', label: '業務効率化・工数削減', description: '手作業が多い、ムダな業務が多い、残業が減らないなど' },
+  { value: 'digitalization', label: 'IT化・デジタル化の遅れ', description: '紙の書類が多い、システムが古い、データ活用ができていないなど' },
+  { value: 'labor_shortage', label: '人手不足・採用難', description: '人が集まらない、離職が多い、人件費が高いなど' },
+  { value: 'revenue_decline', label: '売上・利益の低下', description: '売上が伸びない、利益率が低い、価格競争が激しいなど' },
+  { value: 'customer_acquisition', label: '新規顧客の獲得', description: '新規顧客が取れない、営業力が弱い、認知度が低いなど' },
+  { value: 'productivity', label: '生産性向上', description: '生産効率が悪い、品質が安定しない、納期が守れないなど' },
+  { value: 'subsidy_knowhow', label: '補助金申請のノウハウ不足', description: '申請方法がわからない、書類作成が難しい、採択されないなど' },
+  { value: 'none', label: '特になし', description: '現時点では大きな課題を感じていない' },
+  { value: 'other', label: 'その他', description: '' },
+];
+
+type Step = 1 | 2 | 3 | 4 | 5;
+
+function OnboardingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 招待コード関連
+  const inviteCode = searchParams.get('invite');
+  const [inviteInfo, setInviteInfo] = useState<{
+    valid: boolean;
+    inviterCompanyName: string | null;
+    checked: boolean;
+  }>({ valid: false, inviterCompanyName: null, checked: false });
+
+  // 招待コードの検証
+  useEffect(() => {
+    if (inviteCode) {
+      fetch(`/api/invitations/validate?code=${inviteCode}`)
+        .then(res => res.json())
+        .then(data => {
+          setInviteInfo({
+            valid: data.valid,
+            inviterCompanyName: data.inviterCompanyName || null,
+            checked: true,
+          });
+        })
+        .catch(() => {
+          setInviteInfo({ valid: false, inviterCompanyName: null, checked: true });
+        });
+    }
+  }, [inviteCode]);
+
   // フォームデータ
   const [formData, setFormData] = useState({
+    // Step 1: 会社基本情報
     companyName: '',
     industry: '',
+    // Step 2: 規模情報
     employeeCount: '',
     annualRevenue: '',
     prefecture: '',
+    // Step 3: 補助金ニーズ
+    subsidyExperience: '',
+    subsidyPurposes: [] as string[],
+    subsidyPurposeOther: '',
+    // Step 4: 課題
+    currentChallenges: [] as string[],
+    challengeOther: '',
+    // Step 5: 担当者情報
     contactName: '',
     email: '',
     phone: '',
@@ -84,8 +154,20 @@ export default function OnboardingPage() {
     passwordConfirm: '',
   });
 
-  const updateFormData = (field: string, value: string) => {
+  const updateFormData = (field: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setError(null);
+  };
+
+  const toggleArrayValue = (field: 'subsidyPurposes' | 'currentChallenges', value: string) => {
+    setFormData(prev => {
+      const current = prev[field];
+      if (current.includes(value)) {
+        return { ...prev, [field]: current.filter(v => v !== value) };
+      } else {
+        return { ...prev, [field]: [...current, value] };
+      }
+    });
     setError(null);
   };
 
@@ -116,6 +198,30 @@ export default function OnboardingPage() {
         }
         return true;
       case 3:
+        if (!formData.subsidyExperience) {
+          setError('補助金の利用経験を選択してください');
+          return false;
+        }
+        if (formData.subsidyPurposes.length === 0) {
+          setError('補助金の利用用途を1つ以上選択してください');
+          return false;
+        }
+        if (formData.subsidyPurposes.includes('other') && !formData.subsidyPurposeOther.trim()) {
+          setError('その他の用途を入力してください');
+          return false;
+        }
+        return true;
+      case 4:
+        if (formData.currentChallenges.length === 0) {
+          setError('現在の課題を1つ以上選択してください');
+          return false;
+        }
+        if (formData.currentChallenges.includes('other') && !formData.challengeOther.trim()) {
+          setError('その他の課題を入力してください');
+          return false;
+        }
+        return true;
+      case 5:
         if (!formData.contactName.trim()) {
           setError('担当者名を入力してください');
           return false;
@@ -166,7 +272,7 @@ export default function OnboardingPage() {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) return;
+    if (!validateStep(5)) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -181,6 +287,8 @@ export default function OnboardingPage() {
           ...formData,
           // 確認用フィールドはサーバに送らない
           passwordConfirm: undefined,
+          // 招待コード
+          inviteCode: inviteInfo.valid ? inviteCode : undefined,
         }),
       });
 
@@ -238,12 +346,31 @@ export default function OnboardingPage() {
           </p>
         </div>
 
+        {/* 招待バナー */}
+        {inviteInfo.checked && inviteInfo.valid && inviteInfo.inviterCompanyName && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Gift className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-800">
+                  {inviteInfo.inviterCompanyName} さんからの招待
+                </p>
+                <p className="text-xs text-green-600">
+                  招待リンクから登録いただきありがとうございます
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* プログレスバー */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
+        <div className="flex items-center justify-center gap-1 mb-8">
+          {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300 ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300 ${
                   s < step
                     ? 'bg-blue-600 text-white'
                     : s === step
@@ -251,11 +378,11 @@ export default function OnboardingPage() {
                     : 'bg-slate-200 text-slate-400'
                 }`}
               >
-                {s < step ? <CheckCircle2 className="w-5 h-5" /> : s}
+                {s < step ? <CheckCircle2 className="w-4 h-4" /> : s}
               </div>
-              {s < 3 && (
+              {s < 5 && (
                 <div
-                  className={`w-16 h-1 mx-2 rounded transition-all duration-300 ${
+                  className={`w-8 h-1 mx-1 rounded transition-all duration-300 ${
                     s < step ? 'bg-blue-600' : 'bg-slate-200'
                   }`}
                 />
@@ -342,8 +469,8 @@ export default function OnboardingPage() {
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200 z-[100]">
                       {EMPLOYEE_COUNTS.map((ec) => (
-                        <SelectItem 
-                          key={ec.value} 
+                        <SelectItem
+                          key={ec.value}
                           value={ec.value}
                           className="text-slate-700 focus:bg-blue-50 focus:text-blue-700"
                         >
@@ -364,8 +491,8 @@ export default function OnboardingPage() {
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200 z-[100]">
                       {REVENUE_RANGES.map((rr) => (
-                        <SelectItem 
-                          key={rr.value} 
+                        <SelectItem
+                          key={rr.value}
                           value={rr.value}
                           className="text-slate-700 focus:bg-blue-50 focus:text-blue-700"
                         >
@@ -386,8 +513,8 @@ export default function OnboardingPage() {
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200 max-h-60 z-[100]">
                       {PREFECTURES.map((pref) => (
-                        <SelectItem 
-                          key={pref} 
+                        <SelectItem
+                          key={pref}
                           value={pref}
                           className="text-slate-700 focus:bg-blue-50 focus:text-blue-700"
                         >
@@ -401,8 +528,162 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: 担当者情報 */}
+          {/* Step 3: 補助金ニーズ */}
           {step === 3 && (
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <div className="w-14 h-14 rounded-xl bg-amber-100 flex items-center justify-center mx-auto mb-3">
+                  <Lightbulb className="w-7 h-7 text-amber-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-slate-900">補助金について教えてください</h2>
+                <p className="text-slate-500 text-sm mt-1">
+                  最適な補助金をご提案するために使用します
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {/* 補助金利用経験 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    補助金・助成金の申請経験はありますか？ <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    {SUBSIDY_EXPERIENCES.map((exp) => (
+                      <label
+                        key={exp.value}
+                        className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
+                          formData.subsidyExperience === exp.value
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="subsidyExperience"
+                          value={exp.value}
+                          checked={formData.subsidyExperience === exp.value}
+                          onChange={(e) => updateFormData('subsidyExperience', e.target.value)}
+                          className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-slate-900">{exp.label}</span>
+                          <p className="text-xs text-slate-500 mt-0.5">{exp.description}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 補助金利用用途 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    補助金をどのような用途で利用したいですか？ <span className="text-red-500">*</span>
+                    <span className="text-slate-500 font-normal ml-1">（複数選択可）</span>
+                  </label>
+                  <div className="space-y-2">
+                    {SUBSIDY_PURPOSES.map((purpose) => (
+                      <label
+                        key={purpose.value}
+                        className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
+                          formData.subsidyPurposes.includes(purpose.value)
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.subsidyPurposes.includes(purpose.value)}
+                          onChange={() => toggleArrayValue('subsidyPurposes', purpose.value)}
+                          className="mt-1 mr-3 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-slate-900">{purpose.label}</span>
+                          {purpose.description && (
+                            <p className="text-xs text-slate-500 mt-0.5">{purpose.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {formData.subsidyPurposes.includes('other') && (
+                    <Input
+                      type="text"
+                      placeholder="その他の用途を入力"
+                      value={formData.subsidyPurposeOther}
+                      onChange={(e) => updateFormData('subsidyPurposeOther', e.target.value)}
+                      className="mt-2 border-slate-300 text-slate-900 placeholder:text-slate-400"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: 課題 */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <div className="w-14 h-14 rounded-xl bg-rose-100 flex items-center justify-center mx-auto mb-3">
+                  <HelpCircle className="w-7 h-7 text-rose-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-slate-900">会社の課題について教えてください</h2>
+                <p className="text-slate-500 text-sm mt-1">
+                  課題に合わせた補助金と解決策をご提案します
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  現在、会社で困っていることはありますか？ <span className="text-red-500">*</span>
+                  <span className="text-slate-500 font-normal ml-1">（複数選択可）</span>
+                </label>
+                <div className="space-y-2">
+                  {CURRENT_CHALLENGES.map((challenge) => (
+                    <label
+                      key={challenge.value}
+                      className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
+                        formData.currentChallenges.includes(challenge.value)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.currentChallenges.includes(challenge.value)}
+                        onChange={() => toggleArrayValue('currentChallenges', challenge.value)}
+                        className="mt-1 mr-3 rounded text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-slate-900">{challenge.label}</span>
+                        {challenge.description && (
+                          <p className="text-xs text-slate-500 mt-0.5">{challenge.description}</p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {formData.currentChallenges.includes('other') && (
+                  <Input
+                    type="text"
+                    placeholder="その他の課題を入力"
+                    value={formData.challengeOther}
+                    onChange={(e) => updateFormData('challengeOther', e.target.value)}
+                    className="mt-2 border-slate-300 text-slate-900 placeholder:text-slate-400"
+                  />
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <p className="text-xs text-slate-600">
+                  選択された課題は、無料相談の際にも活用させていただきます。
+                  課題に応じた補助金と、具体的な解決策をご提案いたします。
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: 担当者情報 */}
+          {step === 5 && (
             <div className="space-y-6">
               <div className="text-center mb-6">
                 <div className="w-14 h-14 rounded-xl bg-green-100 flex items-center justify-center mx-auto mb-3">
@@ -510,6 +791,12 @@ export default function OnboardingPage() {
                     <span className="text-slate-500">所在地</span>
                     <span className="text-slate-900 font-medium">{formData.prefecture}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">補助金経験</span>
+                    <span className="text-slate-900 font-medium">
+                      {SUBSIDY_EXPERIENCES.find(e => e.value === formData.subsidyExperience)?.label.split('（')[0]}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -534,7 +821,7 @@ export default function OnboardingPage() {
                 戻る
               </Button>
             )}
-            {step < 3 ? (
+            {step < 5 ? (
               <Button
                 type="button"
                 onClick={handleNext}
@@ -581,3 +868,22 @@ export default function OnboardingPage() {
   );
 }
 
+// Suspenseでラップしてエクスポート
+function OnboardingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center">
+      <div className="flex items-center gap-2 text-slate-500">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span>読み込み中...</span>
+      </div>
+    </div>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<OnboardingFallback />}>
+      <OnboardingContent />
+    </Suspense>
+  );
+}
