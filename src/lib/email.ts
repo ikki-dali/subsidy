@@ -377,6 +377,161 @@ ${sortedSubsidies.map(s => {
 }
 
 /**
+ * 相談予約確定メールを送信
+ */
+export async function sendConsultationConfirmationEmail(params: {
+  to: string;
+  companyName: string;
+  contactName?: string;
+  date: string;
+  startTime: string;
+  consultationTopic?: string;
+  meetLink?: string;
+  isFree: boolean;
+}): Promise<SendResult> {
+  const { to, companyName, contactName, date, startTime, consultationTopic, meetLink, isFree } = params;
+
+  // 日付をフォーマット
+  const dateObj = new Date(date);
+  const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()];
+  const formattedDate = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日(${dayOfWeek})`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
+      <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 24px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">${APP_NAME}</h1>
+        <p style="color: #bfdbfe; margin: 8px 0 0 0; font-size: 14px;">相談予約の確定</p>
+      </div>
+
+      <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 48px;">✅</span>
+          <h2 style="color: #16a34a; margin: 16px 0 8px 0; font-size: 20px;">予約が確定しました</h2>
+        </div>
+
+        <p style="margin-top: 0;">
+          ${escapeHtml(contactName || companyName)} 様
+        </p>
+
+        <p>
+          補助金相談のご予約ありがとうございます。<br>
+          以下の内容で予約が確定いたしました。
+        </p>
+
+        <!-- 予約詳細 -->
+        <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px; margin: 24px 0;">
+          <h3 style="margin: 0 0 16px 0; color: #0369a1; font-size: 16px;">📅 予約内容</h3>
+          <table style="width: 100%;">
+            <tr>
+              <td style="padding: 8px 0; color: #64748b; width: 100px;">日時</td>
+              <td style="padding: 8px 0; font-weight: 600;">${formattedDate} ${startTime}〜（30分）</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;">会社名</td>
+              <td style="padding: 8px 0;">${escapeHtml(companyName)}</td>
+            </tr>
+            ${contactName ? `
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;">担当者</td>
+              <td style="padding: 8px 0;">${escapeHtml(contactName)}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;">種別</td>
+              <td style="padding: 8px 0;">
+                ${isFree 
+                  ? '<span style="background-color: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 12px;">🎟️ 無料枠利用</span>' 
+                  : '<span style="background-color: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 12px;">有料相談</span>'}
+              </td>
+            </tr>
+          </table>
+          ${consultationTopic ? `
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #bae6fd;">
+            <p style="margin: 0 0 4px 0; color: #64748b; font-size: 14px;">ご相談内容：</p>
+            <p style="margin: 0; color: #1e293b;">${escapeHtml(consultationTopic)}</p>
+          </div>
+          ` : ''}
+        </div>
+
+        ${meetLink ? `
+        <!-- Google Meet -->
+        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+          <h3 style="margin: 0 0 12px 0; color: #166534; font-size: 16px;">📹 オンライン相談</h3>
+          <p style="margin: 0 0 12px 0; color: #4b5563; font-size: 14px;">
+            当日は以下のGoogle Meetリンクからご参加ください。
+          </p>
+          <a href="${meetLink}" style="display: inline-block; background-color: #22c55e; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+            Google Meetに参加
+          </a>
+          <p style="margin: 12px 0 0 0; font-size: 12px; color: #6b7280; word-break: break-all;">
+            ${meetLink}
+          </p>
+        </div>
+        ` : ''}
+
+        <div style="background-color: #fffbeb; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 24px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 14px;">
+            ⚠️ <strong>ご注意</strong><br>
+            ・開始時刻の5分前にはオンラインでお待ちください<br>
+            ・やむを得ずキャンセルされる場合は、早めにご連絡ください
+          </p>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+
+        <p style="font-size: 12px; color: #6b7280; margin-bottom: 0; text-align: center;">
+          このメールは${APP_NAME}から自動送信されています。<br>
+          ご不明な点がございましたら、お気軽にお問い合わせください。
+        </p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `
+${contactName || companyName} 様
+
+補助金相談のご予約ありがとうございます。
+以下の内容で予約が確定いたしました。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【予約内容】
+
+日時: ${formattedDate} ${startTime}〜（30分）
+会社名: ${companyName}
+${contactName ? `担当者: ${contactName}` : ''}
+種別: ${isFree ? '無料枠利用' : '有料相談'}
+${consultationTopic ? `\nご相談内容:\n${consultationTopic}` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${meetLink ? `
+【オンライン相談】
+Google Meetリンク: ${meetLink}
+
+当日は上記リンクからご参加ください。
+` : ''}
+【ご注意】
+・開始時刻の5分前にはオンラインでお待ちください
+・やむを得ずキャンセルされる場合は、早めにご連絡ください
+
+---
+${APP_NAME}
+  `.trim();
+
+  return sendEmail({
+    to,
+    subject: `【${APP_NAME}】相談予約が確定しました（${formattedDate} ${startTime}〜）`,
+    html,
+    text,
+  });
+}
+
+/**
  * Resendの設定状態を確認
  */
 export function isEmailConfigured(): boolean {

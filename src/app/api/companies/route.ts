@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 招待コードを使用済みに更新
+    // 招待コードを使用済みに更新 & 招待者に無料相談枠を付与
     if (inviteCode && invitedBy) {
       await supabase
         .from('invitations')
@@ -205,6 +205,28 @@ export async function POST(request: NextRequest) {
           used_at: new Date().toISOString(),
         })
         .eq('code', inviteCode);
+
+      // 招待者の招待成功数と無料相談枠を更新
+      const { data: inviterData } = await supabase
+        .from('companies')
+        .select('total_successful_invites, free_consultation_slots')
+        .eq('id', invitedBy)
+        .single();
+
+      if (inviterData) {
+        const newInviteCount = (inviterData.total_successful_invites || 0) + 1;
+        // 無料相談枠は上限2回まで
+        const currentSlots = inviterData.free_consultation_slots || 0;
+        const newSlots = Math.min(currentSlots + 1, 2);
+
+        await supabase
+          .from('companies')
+          .update({
+            total_successful_invites: newInviteCount,
+            free_consultation_slots: newSlots,
+          })
+          .eq('id', invitedBy);
+      }
     }
 
     // JWTトークンを生成（失敗したら登録済みレコードを巻き戻す）

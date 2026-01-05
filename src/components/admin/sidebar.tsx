@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Banknote,
+  Calendar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -21,6 +22,11 @@ const NAV_ITEMS = [
     label: 'ダッシュボード',
     href: '/admin',
     icon: LayoutDashboard,
+  },
+  {
+    label: '相談予約',
+    href: '/admin/consultations',
+    icon: Calendar,
   },
   {
     label: '通知・リクエスト',

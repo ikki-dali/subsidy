@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Copy, Check, Link2, UserPlus, Clock, Users } from 'lucide-react';
+import { Copy, Check, Link2, UserPlus, Clock, Users, Gift, Phone, Ticket } from 'lucide-react';
 
 type Invitation = {
   id: string;
@@ -23,6 +23,11 @@ export function InvitationGenerator() {
   const [isCreating, setIsCreating] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [latestInviteUrl, setLatestInviteUrl] = useState<string | null>(null);
+  const [slotsInfo, setSlotsInfo] = useState<{
+    freeSlots: number;
+    totalInvites: number;
+    maxSlots: number;
+  } | null>(null);
 
   // 招待一覧を取得
   const fetchInvitations = async () => {
@@ -39,8 +44,22 @@ export function InvitationGenerator() {
     }
   };
 
+  // 無料枠情報を取得
+  const fetchSlotsInfo = async () => {
+    try {
+      const res = await fetch('/api/consultation/slots');
+      if (res.ok) {
+        const data = await res.json();
+        setSlotsInfo(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch slots info:', error);
+    }
+  };
+
   useEffect(() => {
     fetchInvitations();
+    fetchSlotsInfo();
   }, []);
 
   // 招待リンクを生成
@@ -121,8 +140,82 @@ export function InvitationGenerator() {
   const pendingCount = invitations.filter(i => i.status === 'pending').length;
   const usedCount = invitations.filter(i => i.status === 'used').length;
 
+  const remainingInvitesForSlots = slotsInfo ? Math.max(0, slotsInfo.maxSlots - slotsInfo.totalInvites) : 2;
+
   return (
     <div className="space-y-6">
+      {/* 招待特典カード */}
+      <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-green-600" />
+            招待特典
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-white rounded-xl border border-green-200 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                <Phone className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900">
+                  補助金の無料相談（5,000円相当）
+                </p>
+                <p className="text-sm text-slate-600 mt-1">
+                  友達を1人招待するごとに、無料相談枠が1回もらえます！
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 現在の状況 */}
+          {slotsInfo && (
+            <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Ticket className="h-4 w-4 text-green-600" />
+                <span className="text-sm text-slate-700">
+                  現在の無料枠: <span className="font-bold">{slotsInfo.freeSlots}回</span>
+                </span>
+              </div>
+              {slotsInfo.freeSlots > 0 && (
+                <a 
+                  href="/consultation" 
+                  className="text-sm text-green-600 hover:text-green-700 font-medium"
+                >
+                  相談を予約 →
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* 進捗表示 */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-600">招待達成状況</span>
+              <span className="text-slate-900 font-medium">
+                {usedCount} / 2人
+              </span>
+            </div>
+            <div className="h-2 bg-white rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all"
+                style={{ width: `${Math.min(100, (usedCount / 2) * 100)}%` }}
+              />
+            </div>
+            {remainingInvitesForSlots > 0 ? (
+              <p className="text-xs text-slate-500">
+                あと{remainingInvitesForSlots}人招待すると、無料相談枠がもらえます
+              </p>
+            ) : (
+              <p className="text-xs text-green-600 font-medium">
+                🎉 最大枠を達成しました！
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 招待リンク生成カード */}
       <Card>
         <CardHeader>
