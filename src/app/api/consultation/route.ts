@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 会社情報を取得
-    const { data: company } = await supabaseAdmin
+    const { data: company } = await supabase
       .from('companies')
       .select('name, email, free_consultation_slots')
       .eq('id', companyId)
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
 
     // 無料枠を使用した場合、残り枠数を減らす
     if (isFree) {
-      await supabaseAdmin
+      await supabase
         .from('companies')
         .update({
           free_consultation_slots: Math.max(0, (company.free_consultation_slots || 1) - 1),

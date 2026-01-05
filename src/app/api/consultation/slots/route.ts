@@ -5,6 +5,9 @@ import { getCompanyIdFromToken } from '@/lib/auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase = supabaseAdmin as any;
+
 // 無料相談枠の残数と招待成功数を取得
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +21,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: company, error } = await supabaseAdmin
+    const { data: company, error } = await supabase
       .from('companies')
       .select('free_consultation_slots, total_successful_invites')
       .eq('id', companyId)
@@ -45,4 +48,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
