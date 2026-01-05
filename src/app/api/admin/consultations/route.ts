@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { verifyAdminAuth } from '@/lib/admin-auth';
+import { getAdminFromRequest } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 // 予約一覧を取得
 export async function GET(request: NextRequest) {
   // 管理者認証チェック
-  const authResult = verifyAdminAuth(request);
-  if (!authResult.isAuthenticated) {
+  const admin = await getAdminFromRequest(request);
+  if (!admin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
 // 予約のステータスを更新
 export async function PATCH(request: NextRequest) {
   // 管理者認証チェック
-  const authResult = verifyAdminAuth(request);
-  if (!authResult.isAuthenticated) {
+  const admin = await getAdminFromRequest(request);
+  if (!admin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
