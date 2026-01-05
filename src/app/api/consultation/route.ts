@@ -8,6 +8,9 @@ import { sendConsultationConfirmationEmail } from '@/lib/email';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase = supabaseAdmin as any;
+
 // 相談予約一覧を取得
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +24,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: bookings, error } = await supabaseAdmin
+    const { data: bookings, error } = await supabase
       .from('consultation_bookings')
       .select('*')
       .eq('company_id', companyId)
@@ -158,7 +161,7 @@ export async function POST(request: NextRequest) {
     endDateTime.setHours(hour + 1, minute, 0, 0); // バッファ込みで1時間
 
     // 予約を作成
-    const { data: booking, error } = await supabaseAdmin
+    const { data: booking, error } = await supabase
       .from('consultation_bookings')
       .insert({
         company_id: companyId,

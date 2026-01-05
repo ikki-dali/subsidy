@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
   const offset = parseInt(searchParams.get('offset') || '0');
 
   try {
-    let query = supabaseAdmin
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabaseAdmin as any)
       .from('consultation_bookings')
       .select(`
         *,
@@ -49,21 +50,23 @@ export async function GET(request: NextRequest) {
     }
 
     // 統計情報
-    const { data: stats } = await supabaseAdmin
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const statsResult = await (supabaseAdmin as any)
       .from('consultation_bookings')
-      .select('status')
-      .then(res => {
-        const data = res.data || [];
-        return {
-          data: {
-            total: data.length,
-            pending: data.filter(b => b.status === 'pending').length,
-            confirmed: data.filter(b => b.status === 'confirmed').length,
-            completed: data.filter(b => b.status === 'completed').length,
-            cancelled: data.filter(b => b.status === 'cancelled').length,
-          }
-        };
-      });
+      .select('status');
+    
+    const statsData = statsResult.data || [];
+    const stats = {
+      total: statsData.length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pending: statsData.filter((b: any) => b.status === 'pending').length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      confirmed: statsData.filter((b: any) => b.status === 'confirmed').length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      completed: statsData.filter((b: any) => b.status === 'completed').length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cancelled: statsData.filter((b: any) => b.status === 'cancelled').length,
+    };
 
     return NextResponse.json({
       bookings: bookings || [],
@@ -113,7 +116,8 @@ export async function PATCH(request: NextRequest) {
       updateData.completed_at = new Date().toISOString();
     }
 
-    const { data, error } = await supabaseAdmin
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabaseAdmin as any)
       .from('consultation_bookings')
       .update(updateData)
       .eq('id', id)
@@ -137,4 +141,3 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
-
