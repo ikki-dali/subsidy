@@ -169,22 +169,31 @@ export function InvitationGenerator() {
             </div>
           </div>
 
-          {/* 現在の状況 */}
+          {/* 現在の状況と予約ボタン */}
           {slotsInfo && (
-            <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Ticket className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-slate-700">
-                  現在の無料枠: <span className="font-bold">{slotsInfo.freeSlots}回</span>
-                </span>
+            <div className="p-4 bg-white rounded-xl border border-green-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Ticket className="h-5 w-5 text-green-600" />
+                  <span className="text-slate-700">
+                    現在の無料枠: <span className="font-bold text-lg text-green-700">{slotsInfo.freeSlots}回</span>
+                  </span>
+                </div>
               </div>
-              {slotsInfo.freeSlots > 0 && (
-                <a 
-                  href="/consultation" 
-                  className="text-sm text-green-600 hover:text-green-700 font-medium"
+              {slotsInfo.freeSlots > 0 ? (
+                <Button 
+                  asChild
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
                 >
-                  相談を予約 →
-                </a>
+                  <a href="/consultation">
+                    <Phone className="h-4 w-4 mr-2" />
+                    無料相談を予約する
+                  </a>
+                </Button>
+              ) : (
+                <p className="text-sm text-slate-500 text-center">
+                  友達を招待して無料相談枠をゲットしよう！
+                </p>
               )}
             </div>
           )}
