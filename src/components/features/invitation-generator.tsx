@@ -173,40 +173,29 @@ export function InvitationGenerator() {
           </div>
 
           {/* 現在の状況と予約ボタン */}
-          {slotsInfo && (
-            <div className="p-4 bg-white rounded-xl border border-green-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Ticket className="h-5 w-5 text-green-600" />
-                  <span className="text-slate-700">
-                    現在の無料枠: <span className="font-bold text-lg text-green-700">{slotsInfo.freeSlots}回</span>
-                  </span>
-                </div>
-              </div>
-              {slotsInfo.freeSlots > 0 ? (
-                <Button 
-                  asChild
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
-                >
-                  <a href="/consultation">
-                    <Phone className="h-4 w-4 mr-2" />
-                    無料相談を予約する
-                  </a>
-                </Button>
-              ) : (
-                <p className="text-sm text-slate-500 text-center">
-                  友達を招待して無料相談枠をゲットしよう！
-                </p>
-              )}
+          <div className="flex items-center justify-between p-3 bg-white/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Ticket className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-slate-700">
+                現在の無料枠: <span className="font-bold">{earnedSlots}回</span>
+              </span>
             </div>
-          )}
+            {earnedSlots > 0 && (
+              <a 
+                href="/consultation" 
+                className="text-sm text-green-600 hover:text-green-700 font-medium"
+              >
+                相談を予約 →
+              </a>
+            )}
+          </div>
 
           {/* 進捗表示 */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-600">招待達成状況（最大{maxSlots}枠）</span>
+              <span className="text-slate-600">招待達成状況</span>
               <span className="text-slate-900 font-medium">
-                {usedCount}人招待済み → {earnedSlots}枠獲得
+                {usedCount} / {maxSlots}人
               </span>
             </div>
             <div className="h-2 bg-white rounded-full overflow-hidden">
@@ -217,7 +206,7 @@ export function InvitationGenerator() {
             </div>
             {remainingInvitesForSlots > 0 ? (
               <p className="text-xs text-slate-500">
-                あと{remainingInvitesForSlots}人招待で、さらに無料枠がもらえます
+                あと{remainingInvitesForSlots}人招待すると、無料相談枠がもらえます
               </p>
             ) : (
               <p className="text-xs text-green-600 font-medium">
