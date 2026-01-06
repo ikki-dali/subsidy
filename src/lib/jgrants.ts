@@ -47,9 +47,9 @@ export function parseIndustry(industry?: string): string[] {
   return industry.split('/').map(s => s.trim()).filter(Boolean);
 }
 
-// 金額フォーマット（負の値や0は「金額未定」）
+// 金額フォーマット（負の値や0は「要問い合わせ」）
 export function formatCurrency(amount?: number | null): string {
-  if (!amount || amount <= 0) return '金額未定';
+  if (!amount || amount <= 0) return '要問い合わせ';
   if (amount >= 100000000) return `${(amount / 100000000).toFixed(1)}億円`;
   if (amount >= 10000) return `${(amount / 10000).toFixed(0)}万円`;
   return `${amount.toLocaleString()}円`;

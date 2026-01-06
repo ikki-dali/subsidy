@@ -124,15 +124,17 @@ export default async function SubsidyDetailPage({ params }: Props) {
     });
   };
 
-  // 金額を読みやすく表示（負の値や0は表示しない）
+  // 金額を読みやすく表示
   const formatAmountDisplay = (amount: number | null | undefined) => {
-    if (!amount || amount <= 0) return null;
-    if (amount >= 100000000) {
-      return { value: (amount / 100000000).toFixed(1), unit: '億円' };
-    } else if (amount >= 10000) {
-      return { value: Math.round(amount / 10000).toLocaleString(), unit: '万円' };
+    if (!amount || amount <= 0) {
+      return { value: '要問い合わせ', unit: '', isUnknown: true };
     }
-    return { value: amount.toLocaleString(), unit: '円' };
+    if (amount >= 100000000) {
+      return { value: (amount / 100000000).toFixed(1), unit: '億円', isUnknown: false };
+    } else if (amount >= 10000) {
+      return { value: Math.round(amount / 10000).toLocaleString(), unit: '万円', isUnknown: false };
+    }
+    return { value: amount.toLocaleString(), unit: '円', isUnknown: false };
   };
 
   const amountDisplay = formatAmountDisplay(subsidy.max_amount);
@@ -188,9 +190,16 @@ export default async function SubsidyDetailPage({ params }: Props) {
                     </Badge>
                 
                 {amountDisplay && (
-                  <Badge variant="secondary" className="bg-white/80 text-blue-700 font-semibold px-2 sm:px-3 py-1 text-xs sm:text-sm">
+                  <Badge 
+                    variant="secondary" 
+                    className={`font-semibold px-2 sm:px-3 py-1 text-xs sm:text-sm ${
+                      amountDisplay.isUnknown 
+                        ? 'bg-slate-100 text-slate-600' 
+                        : 'bg-white/80 text-blue-700'
+                    }`}
+                  >
                     <Wallet className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
-                    最大{amountDisplay.value}{amountDisplay.unit}
+                    {amountDisplay.isUnknown ? amountDisplay.value : `最大${amountDisplay.value}${amountDisplay.unit}`}
                   </Badge>
                 )}
               </div>
@@ -340,29 +349,25 @@ export default async function SubsidyDetailPage({ params }: Props) {
             <Card className="rounded-xl sm:rounded-2xl shadow-sm overflow-hidden">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 sm:p-6">
                 <div className="text-blue-100 text-xs sm:text-sm font-medium mb-1">補助上限額</div>
-                {amountDisplay ? (
+                {amountDisplay && !amountDisplay.isUnknown ? (
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl sm:text-4xl font-bold text-white">{amountDisplay.value}</span>
                     <span className="text-lg sm:text-xl text-blue-100">{amountDisplay.unit}</span>
                   </div>
                 ) : (
                   <div>
-                    <span className="text-lg sm:text-xl font-bold text-white">要確認</span>
-                    <p className="text-blue-200 text-xs mt-1">申請内容により個別決定</p>
+                    <span className="text-lg sm:text-xl font-bold text-white">要問い合わせ</span>
+                    <p className="text-blue-200 text-xs mt-1">詳細は公式サイトをご確認ください</p>
                   </div>
                 )}
 
-                {subsidy.subsidy_rate ? (
+                {subsidy.subsidy_rate && (
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-blue-400/30">
                     <div className="text-blue-100 text-xs sm:text-sm font-medium mb-1">補助率</div>
                     <div className="flex items-center gap-2">
                       <Percent className="h-4 w-4 sm:h-5 sm:w-5 text-blue-200" />
                       <span className="text-xl sm:text-2xl font-bold text-white">{subsidy.subsidy_rate}</span>
                     </div>
-                  </div>
-                ) : !amountDisplay && (
-                  <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-blue-400/30">
-                    <p className="text-blue-200 text-xs">詳細は公式サイトをご確認ください</p>
                   </div>
                 )}
               </div>

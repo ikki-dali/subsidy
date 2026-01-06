@@ -23,11 +23,6 @@ export function InvitationGenerator() {
   const [isCreating, setIsCreating] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [latestInviteUrl, setLatestInviteUrl] = useState<string | null>(null);
-  const [slotsInfo, setSlotsInfo] = useState<{
-    freeSlots: number;
-    totalInvites: number;
-    maxSlots: number;
-  } | null>(null);
 
   // 招待一覧を取得
   const fetchInvitations = async () => {
@@ -44,22 +39,8 @@ export function InvitationGenerator() {
     }
   };
 
-  // 無料枠情報を取得
-  const fetchSlotsInfo = async () => {
-    try {
-      const res = await fetch('/api/consultation/slots');
-      if (res.ok) {
-        const data = await res.json();
-        setSlotsInfo(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch slots info:', error);
-    }
-  };
-
   useEffect(() => {
     fetchInvitations();
-    fetchSlotsInfo();
   }, []);
 
   // 招待リンクを生成

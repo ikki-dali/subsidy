@@ -75,16 +75,18 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
 
   const config = statusConfig[status];
 
-  // 金額を視覚的に表示（負の値や0は表示しない）
+  // 金額を視覚的に表示
   const formatAmountDisplay = (amount: number | null | undefined) => {
-    if (!amount || amount <= 0) return null;
+    if (!amount || amount <= 0) {
+      return { value: '要問い合わせ', unit: '', isUnknown: true };
+    }
     
     if (amount >= 100000000) {
-      return { value: (amount / 100000000).toFixed(1), unit: '億円' };
+      return { value: (amount / 100000000).toFixed(1), unit: '億円', isUnknown: false };
     } else if (amount >= 10000) {
-      return { value: Math.round(amount / 10000), unit: '万円' };
+      return { value: Math.round(amount / 10000), unit: '万円', isUnknown: false };
     }
-    return { value: amount.toLocaleString(), unit: '円' };
+    return { value: amount.toLocaleString(), unit: '円', isUnknown: false };
   };
 
   const amountDisplay = formatAmountDisplay(subsidy.max_amount);
@@ -116,8 +118,12 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
               </div>
               {amountDisplay && (
                 <div className="text-right shrink-0">
-                  <span className="text-lg font-bold text-blue-600">{amountDisplay.value}</span>
-                  <span className="text-xs text-muted-foreground ml-0.5">{amountDisplay.unit}</span>
+                  <span className={`text-lg font-bold ${amountDisplay.isUnknown ? 'text-slate-500 text-sm' : 'text-blue-600'}`}>
+                    {amountDisplay.value}
+                  </span>
+                  {amountDisplay.unit && (
+                    <span className="text-xs text-muted-foreground ml-0.5">{amountDisplay.unit}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -142,9 +148,16 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
               
               {/* 金額バッジ */}
               {amountDisplay && (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+                <Badge 
+                  variant="secondary" 
+                  className={`text-xs ${
+                    amountDisplay.isUnknown 
+                      ? 'bg-slate-100 text-slate-600 border-slate-200' 
+                      : 'bg-blue-100 text-blue-700 border-blue-200'
+                  }`}
+                >
                   <TrendingUp className="h-3 w-3 mr-0.5 sm:mr-1" />
-                  最大{amountDisplay.value}{amountDisplay.unit}
+                  {amountDisplay.isUnknown ? amountDisplay.value : `最大${amountDisplay.value}${amountDisplay.unit}`}
                 </Badge>
               )}
             </div>
