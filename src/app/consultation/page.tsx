@@ -34,14 +34,17 @@ export default function ConsultationPage() {
 
   const fetchData = async () => {
     try {
-      const [slotsRes, bookingsRes] = await Promise.all([
-        fetch('/api/consultation/slots'),
+      const [invitesRes, bookingsRes] = await Promise.all([
+        fetch('/api/invitations'),
         fetch('/api/consultation'),
       ]);
 
-      if (slotsRes.ok) {
-        const slotsData = await slotsRes.json();
-        setFreeSlots(slotsData.freeSlots);
+      // 招待履歴から無料枠を計算（DBの値が信頼できない場合のため）
+      if (invitesRes.ok) {
+        const invitesData = await invitesRes.json();
+        const invitations = invitesData.invitations || [];
+        const usedCount = invitations.filter((i: { status: string }) => i.status === 'used').length;
+        setFreeSlots(Math.min(usedCount, 2)); // 最大2枠
       }
 
       if (bookingsRes.ok) {
@@ -92,7 +95,7 @@ export default function ConsultationPage() {
             </span>
           </Link>
           <Link 
-            href="/" 
+            href="/invite" 
             className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
