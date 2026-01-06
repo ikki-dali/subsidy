@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     // 招待URLを生成
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const inviteUrl = `${baseUrl}/onboarding?invite=${code}`;
+    const inviteUrl = `${baseUrl}/?invite=${code}`;
 
     return NextResponse.json({
       invitation: {

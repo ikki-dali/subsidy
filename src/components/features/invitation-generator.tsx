@@ -95,7 +95,7 @@ export function InvitationGenerator() {
   // リンクをコピー
   const copyInviteLink = async (code: string) => {
     const baseUrl = window.location.origin;
-    const url = `${baseUrl}/onboarding?invite=${code}`;
+    const url = `${baseUrl}/?invite=${code}`;
     
     try {
       await navigator.clipboard.writeText(url);

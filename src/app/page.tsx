@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { SearchForm } from "@/components/features/search-form";
 import { RecommendedSection } from "@/components/features/recommended-section";
 import { Header } from "@/components/layout/header";
+import { InviteWelcomeModal } from "@/components/features/invite-welcome-modal";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import Link from "next/link";
 import { AuthRequiredLink } from "@/components/features/auth-required-link";
+import { Suspense } from "react";
 import { 
   Search, 
   MapPin, 
@@ -52,6 +54,11 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white overflow-x-hidden">
+      {/* 招待モーダル */}
+      <Suspense fallback={null}>
+        <InviteWelcomeModal />
+      </Suspense>
+
       {/* ヘッダー */}
       <Header />
 
