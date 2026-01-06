@@ -140,7 +140,10 @@ export function InvitationGenerator() {
   const pendingCount = invitations.filter(i => i.status === 'pending').length;
   const usedCount = invitations.filter(i => i.status === 'used').length;
 
-  const remainingInvitesForSlots = slotsInfo ? Math.max(0, slotsInfo.maxSlots - slotsInfo.totalInvites) : 2;
+  // 招待履歴ベースで計算（DBの値より招待履歴の方が正確）
+  const maxSlots = 2;
+  const earnedSlots = Math.min(usedCount, maxSlots); // 招待成功数から獲得した枠
+  const remainingInvitesForSlots = Math.max(0, maxSlots - usedCount);
 
   return (
     <div className="space-y-6">
@@ -201,20 +204,20 @@ export function InvitationGenerator() {
           {/* 進捗表示 */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-600">招待達成状況</span>
+              <span className="text-slate-600">招待達成状況（最大{maxSlots}枠）</span>
               <span className="text-slate-900 font-medium">
-                {usedCount} / 2人
+                {usedCount}人招待済み → {earnedSlots}枠獲得
               </span>
             </div>
             <div className="h-2 bg-white rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all"
-                style={{ width: `${Math.min(100, (usedCount / 2) * 100)}%` }}
+                style={{ width: `${Math.min(100, (usedCount / maxSlots) * 100)}%` }}
               />
             </div>
             {remainingInvitesForSlots > 0 ? (
               <p className="text-xs text-slate-500">
-                あと{remainingInvitesForSlots}人招待すると、無料相談枠がもらえます
+                あと{remainingInvitesForSlots}人招待で、さらに無料枠がもらえます
               </p>
             ) : (
               <p className="text-xs text-green-600 font-medium">
