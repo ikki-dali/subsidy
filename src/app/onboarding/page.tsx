@@ -139,15 +139,15 @@ function OnboardingContent() {
               checked: true,
             });
           } else {
-            // 無効な招待コードの場合はトップページにリダイレクト
+            // 無効な招待コードの場合は使用済みページにリダイレクト
             sessionStorage.removeItem('invite_code');
-            router.push('/?error=invalid_invite');
+            router.push('/invite-used');
           }
         })
         .catch(() => {
-          // エラー時もトップページにリダイレクト
+          // エラー時も使用済みページにリダイレクト
           sessionStorage.removeItem('invite_code');
-          router.push('/?error=invalid_invite');
+          router.push('/invite-used');
         });
     }
   }, [inviteCode, router]);

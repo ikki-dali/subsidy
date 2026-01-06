@@ -26,11 +26,9 @@ export function InviteWelcomeModal() {
           sessionStorage.setItem('invite_code', inviteCode);
           setIsOpen(true);
         } else {
-          // 無効な場合はエラー表示してsessionStorageから削除
-          toast.error(data.error || '無効な招待コードです');
+          // 無効な場合はsessionStorageから削除して使用済みページへ
           sessionStorage.removeItem('invite_code');
-          // URLからinviteパラメータを削除
-          router.replace('/', { scroll: false });
+          router.replace('/invite-used');
         }
       } catch (error) {
         console.error('Failed to validate invite code:', error);
