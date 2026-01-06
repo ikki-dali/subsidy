@@ -2,7 +2,11 @@ import { google, calendar_v3 } from 'googleapis';
 
 // 環境変数から認証情報を取得
 const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
-const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+// Vercelでは環境変数の \n がリテラル文字列になるため変換が必要
+// また、ダブルクォートで囲まれている場合は削除
+const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY
+  ?.replace(/^"|"$/g, '')  // 先頭・末尾のダブルクォートを削除
+  .replace(/\\n/g, '\n');  // \n を実際の改行に変換
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
 // 相談の設定
