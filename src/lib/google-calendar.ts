@@ -113,7 +113,8 @@ export async function getAvailableSlots(
     return availableSlots;
   } catch (error) {
     console.error('Error fetching calendar availability:', error);
-    return [];
+    // エラー時はモックスロットを返す（カレンダー連携失敗時のフォールバック）
+    return getMockSlots(date);
   }
 }
 
