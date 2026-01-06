@@ -10,40 +10,36 @@ export function InviteWelcomeModal() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
   const inviteCode = searchParams.get('invite');
 
   useEffect(() => {
-    if (inviteCode) {
-      // 招待コードをバリデーション
-      validateInviteCode(inviteCode);
-    }
-  }, [inviteCode]);
+    if (!inviteCode) return;
 
-  const validateInviteCode = async (code: string) => {
-    setIsValidating(true);
-    try {
-      const res = await fetch(`/api/invitations/validate?code=${code}`);
-      const data = await res.json();
-      
-      if (data.valid) {
-        // 有効な場合のみsessionStorageに保存してモーダル表示
-        sessionStorage.setItem('invite_code', code);
-        setIsOpen(true);
-      } else {
-        // 無効な場合はエラー表示してsessionStorageから削除
-        toast.error(data.error || '無効な招待コードです');
-        sessionStorage.removeItem('invite_code');
-        // URLからinviteパラメータを削除
-        router.replace('/', { scroll: false });
+    // 招待コードをバリデーション
+    const validateInviteCode = async () => {
+      try {
+        const res = await fetch(`/api/invitations/validate?code=${inviteCode}`);
+        const data = await res.json();
+        
+        if (data.valid) {
+          // 有効な場合のみsessionStorageに保存してモーダル表示
+          sessionStorage.setItem('invite_code', inviteCode);
+          setIsOpen(true);
+        } else {
+          // 無効な場合はエラー表示してsessionStorageから削除
+          toast.error(data.error || '無効な招待コードです');
+          sessionStorage.removeItem('invite_code');
+          // URLからinviteパラメータを削除
+          router.replace('/', { scroll: false });
+        }
+      } catch (error) {
+        console.error('Failed to validate invite code:', error);
+        toast.error('招待コードの検証に失敗しました');
       }
-    } catch (error) {
-      console.error('Failed to validate invite code:', error);
-      toast.error('招待コードの検証に失敗しました');
-    } finally {
-      setIsValidating(false);
-    }
-  };
+    };
+
+    validateInviteCode();
+  }, [inviteCode, router]);
 
   const handleRegister = () => {
     router.push(`/onboarding?invite=${inviteCode}`);
