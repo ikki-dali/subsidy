@@ -104,13 +104,27 @@ function OnboardingContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 招待コード関連
-  const inviteCode = searchParams.get('invite');
+  // 招待コード関連（URLパラメータ優先、なければsessionStorageから取得）
+  const urlInviteCode = searchParams.get('invite');
+  const [inviteCode, setInviteCode] = useState<string | null>(urlInviteCode);
   const [inviteInfo, setInviteInfo] = useState<{
     valid: boolean;
     inviterCompanyName: string | null;
     checked: boolean;
   }>({ valid: false, inviterCompanyName: null, checked: false });
+
+  // sessionStorageから招待コードを復元（LINEなどでパラメータが消えた場合の対策）
+  useEffect(() => {
+    if (!urlInviteCode) {
+      const storedCode = sessionStorage.getItem('invite_code');
+      if (storedCode) {
+        setInviteCode(storedCode);
+      }
+    } else {
+      // URLにある場合はsessionStorageにも保存
+      sessionStorage.setItem('invite_code', urlInviteCode);
+    }
+  }, [urlInviteCode]);
 
   // 招待コードの検証
   useEffect(() => {
@@ -308,12 +322,19 @@ function OnboardingContent() {
       if (redirectPath && redirectPath.startsWith('/') && !redirectPath.startsWith('/api')) {
         try {
           sessionStorage.removeItem('redirect_after_onboarding');
+          sessionStorage.removeItem('invite_code');
         } catch {
           // ignore
         }
         router.push(redirectPath);
       } else {
-      router.push('/');
+        // 招待コードをクリア
+        try {
+          sessionStorage.removeItem('invite_code');
+        } catch {
+          // ignore
+        }
+        router.push('/');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '登録に失敗しました');

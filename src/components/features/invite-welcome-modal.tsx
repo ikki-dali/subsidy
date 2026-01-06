@@ -13,6 +13,8 @@ export function InviteWelcomeModal() {
 
   useEffect(() => {
     if (inviteCode) {
+      // sessionStorageに招待コードを保存（LINEなどでパラメータが消えても維持）
+      sessionStorage.setItem('invite_code', inviteCode);
       setIsOpen(true);
     }
   }, [inviteCode]);
