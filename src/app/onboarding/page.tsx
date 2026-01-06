@@ -132,17 +132,25 @@ function OnboardingContent() {
       fetch(`/api/invitations/validate?code=${inviteCode}`)
         .then(res => res.json())
         .then(data => {
-          setInviteInfo({
-            valid: data.valid,
-            inviterCompanyName: data.inviterCompanyName || null,
-            checked: true,
-          });
+          if (data.valid) {
+            setInviteInfo({
+              valid: true,
+              inviterCompanyName: data.inviterCompanyName || null,
+              checked: true,
+            });
+          } else {
+            // 無効な招待コードの場合はトップページにリダイレクト
+            sessionStorage.removeItem('invite_code');
+            router.push('/?error=invalid_invite');
+          }
         })
         .catch(() => {
-          setInviteInfo({ valid: false, inviterCompanyName: null, checked: true });
+          // エラー時もトップページにリダイレクト
+          sessionStorage.removeItem('invite_code');
+          router.push('/?error=invalid_invite');
         });
     }
-  }, [inviteCode]);
+  }, [inviteCode, router]);
 
   // フォームデータ
   const [formData, setFormData] = useState({
