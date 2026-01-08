@@ -14,3 +14,4 @@ CREATE POLICY "Service role can do all on notification_history" ON notification_
 
 
 
+

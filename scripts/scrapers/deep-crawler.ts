@@ -75,6 +75,9 @@ export class DeepCrawlerScraper extends BaseScraper {
 
 // 定義済みのディープクローラーターゲット
 export const DEEP_CRAWL_TARGETS: DeepCrawlTarget[] = [
+  // ========================================
+  // 東京都
+  // ========================================
   {
     name: 'tokyo-kosha',
     displayName: '東京都中小企業振興公社',
@@ -91,7 +94,7 @@ export const DEEP_CRAWL_TARGETS: DeepCrawlTarget[] = [
     name: 'tokyo-metro',
     displayName: '東京都産業労働局',
     entryUrls: [
-      'https://www.metro.tokyo.lg.jp/tosei/hodohappyo/press/index.html',
+      'https://www.sangyo-rodo.metro.tokyo.lg.jp/chushou/',
     ],
     config: {
       maxDepth: 3,
@@ -99,6 +102,63 @@ export const DEEP_CRAWL_TARGETS: DeepCrawlTarget[] = [
       stayInDomain: true,
     },
   },
+  // ========================================
+  // 埼玉県
+  // ========================================
+  {
+    name: 'saitama-j',
+    displayName: '埼玉県産業振興公社',
+    entryUrls: [
+      'https://www.saitama-j.or.jp/',
+    ],
+    config: {
+      maxDepth: 4,
+      maxPages: 200,
+      stayInDomain: true,
+    },
+  },
+  {
+    name: 'saitama-pref',
+    displayName: '埼玉県庁産業労働部',
+    entryUrls: [
+      'https://www.pref.saitama.lg.jp/a0801/',
+    ],
+    config: {
+      maxDepth: 3,
+      maxPages: 150,
+      stayInDomain: true,
+    },
+  },
+  // ========================================
+  // 商工会・商工会連合会
+  // ========================================
+  {
+    name: 'tokyo-shokokai',
+    displayName: '東京都商工会連合会',
+    entryUrls: [
+      'https://www.shokokai-tokyo.or.jp/consultation/shiensaku/tokyotoshiensaku/josei',
+    ],
+    config: {
+      maxDepth: 3,
+      maxPages: 100,
+      stayInDomain: true,
+    },
+  },
+  {
+    name: 'saitama-shokokai',
+    displayName: '埼玉県商工会連合会',
+    entryUrls: [
+      'https://www.saitama-shokokai.or.jp/',
+    ],
+    config: {
+      maxDepth: 3,
+      maxPages: 100,
+      stayInDomain: true,
+    },
+  },
+  // ========================================
+  // 国（経済産業省）
+  // ========================================
   {
     name: 'meti',
     displayName: '経済産業省',

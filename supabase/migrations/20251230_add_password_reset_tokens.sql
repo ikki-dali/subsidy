@@ -29,3 +29,4 @@ COMMENT ON COLUMN password_reset_tokens.token IS 'リセットトークン（URL
 COMMENT ON COLUMN password_reset_tokens.expires_at IS '有効期限（通常1時間）';
 COMMENT ON COLUMN password_reset_tokens.used_at IS '使用日時（NULLなら未使用）';
 
+

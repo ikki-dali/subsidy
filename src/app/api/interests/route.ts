@@ -159,7 +159,7 @@ async function sendSlackNotification(data: {
 export async function POST(request: NextRequest) {
   // Rate Limiting
   const ip = getClientIp(request);
-  const rateLimit = checkRateLimit(ip, '/api/interests');
+  const rateLimit = await checkRateLimit(ip, '/api/interests');
   
   if (!rateLimit.success) {
     return NextResponse.json(

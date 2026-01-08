@@ -22,6 +22,9 @@ import {
   Shield,
 } from "lucide-react";
 
+// ISRキャッシュ: 1時間ごとに再生成（補助金データは日次更新なので十分）
+export const revalidate = 3600;
+
 // 統計情報を取得
 async function getStats() {
   const today = new Date().toISOString().split('T')[0];

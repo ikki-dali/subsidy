@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { Subsidy } from '@/types/database';
 import { checkRateLimit, getRateLimitHeaders, getClientIp } from '@/lib/rate-limit';
+import { getCachedRecommended } from '@/lib/cache';
 
 function escapeForPostgrestJsonString(value: string): string {
   // `industry.cs.["..."]` に埋め込むため、JSON文字列として壊れないようにエスケープ
@@ -58,24 +59,40 @@ async function getSubsidies(
   extraFilter?: (query: ReturnType<typeof supabase.from>) => ReturnType<typeof supabase.from>,
   limit = 6,
   onlyActive = true, // true: 募集中のみ / false: 募集終了も含む
-  area?: string, // 地域フィルタ
-  industry?: string // 業種フィルタ
+  area?: string, // 地域フィルタ（単一）
+  industry?: string, // 業種フィルタ
+  areas?: string[] // 地域フィルタ（複数、東京・埼玉デフォルト用）
 ): Promise<Subsidy[]> {
   const now = new Date().toISOString();
   const hasAreaFilter = area && area !== '全国';
+  const hasAreasFilter = areas && areas.length > 0;
   const hasIndustryFilter = industry && industry !== 'その他' && industry !== 'other';
   
   // フィルタが指定されている場合は、優先度付きで取得
-  if (hasAreaFilter || hasIndustryFilter) {
+  if (hasAreaFilter || hasAreasFilter || hasIndustryFilter) {
     const results: Subsidy[] = [];
     const seenIds = new Set<string>();
     
-    // 1. まず両方にマッチする補助金を取得
-    if (hasAreaFilter && hasIndustryFilter) {
+    // 複数地域フィルタの場合、各地域でOR検索
+    const buildAreaQuery = (q: ReturnType<typeof supabase.from>) => {
+      if (hasAreaFilter) {
+        return q.contains('target_area', [area]);
+      }
+      if (hasAreasFilter) {
+        // 複数地域: いずれかに該当（OR条件）
+        const areaFilters = areas!.map(a => `target_area.cs.["${a}"]`).join(',');
+        return q.or(areaFilters);
+      }
+      return q;
+    };
+    
+    // 1. まず地域と業種両方にマッチする補助金を取得
+    if ((hasAreaFilter || hasAreasFilter) && hasIndustryFilter) {
       let query = supabase
         .from('subsidies')
-        .select('*')
-        .contains('target_area', [area]);
+        .select('*');
+      
+      query = buildAreaQuery(query);
       
       // 業種フィルタ（JGSONBの配列内検索）
       const industryVariants = normalizeIndustry(industry);
@@ -107,11 +124,12 @@ async function getSubsidies(
     }
 
     // 2. 地域のみマッチする補助金を追加
-    if (hasAreaFilter && results.length < limit) {
+    if ((hasAreaFilter || hasAreasFilter) && results.length < limit) {
       let query = supabase
         .from('subsidies')
-        .select('*')
-        .contains('target_area', [area]);
+        .select('*');
+      
+      query = buildAreaQuery(query);
 
       if (onlyActive) {
         query = query.eq('is_active', true);
@@ -222,18 +240,29 @@ async function getSubsidies(
   return (data || []) as Subsidy[];
 }
 
+// 東京・埼玉特化: デフォルトで東京都・埼玉県のみ表示
+const DEFAULT_AREAS = ['東京都', '埼玉県'];
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const category = searchParams.get('category') || 'all';
   const limit = parseInt(searchParams.get('limit') || '6', 10);
-  const area = searchParams.get('area') || undefined;
+  
+  // 地域フィルタ: デフォルトは東京・埼玉
+  // area=all で全国表示、area=東京都 で東京のみ、など
+  const areaParam = searchParams.get('area');
+  const area = areaParam === 'all' ? undefined : (areaParam || undefined);
+  
+  // 地域が指定されていない場合、東京・埼玉をデフォルトにする
+  const useDefaultAreas = !areaParam;
+  
   const industry = searchParams.get('industry') || undefined;
   // category=all のときのみ有効: active=true で募集中のみ
   const activeOnlyForAll = searchParams.get('active') === 'true';
 
   // Rate Limiting（公開API）
   const ip = getClientIp(request);
-  const rateLimit = checkRateLimit(ip, request.nextUrl.pathname);
+  const rateLimit = await checkRateLimit(ip, request.nextUrl.pathname);
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: 'リクエストが多すぎます。しばらくしてからお試しください。' },
@@ -245,9 +274,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let subsidies: Subsidy[] = [];
+    // デフォルト地域（東京・埼玉）を使用するかどうか
+    const defaultAreas = useDefaultAreas ? DEFAULT_AREAS : undefined;
+    
+    // キャッシュキー用のパラメータ
+    const cacheParams = {
+      category,
+      limit: String(limit),
+      area: area || (useDefaultAreas ? 'tokyo-saitama' : null),
+      industry: industry || null,
+      active: activeOnlyForAll ? 'true' : null,
+    };
 
-    switch (category) {
+    // キャッシュ付きでデータを取得
+    const result = await getCachedRecommended(cacheParams, async () => {
+      let subsidies: Subsidy[] = [];
+
+      switch (category) {
       case 'ai_dx': {
         // 1) 手動ピン（募集終了も含む）を最優先で取得（パーソナライズはかけない＝全員に見せる）
         const pinned = await getSubsidies(
@@ -335,7 +378,8 @@ export async function GET(request: NextRequest) {
           remaining,
           true,
           area,
-          industry
+          industry,
+          defaultAreas
         );
 
         // 重複を除去（ピン→自動の順で並べる）
@@ -351,7 +395,7 @@ export async function GET(request: NextRequest) {
       }
 
       case 'deadline': // 締切間近
-        subsidies = await getSubsidies('end_date', true, undefined, limit, true, area, industry);
+        subsidies = await getSubsidies('end_date', true, undefined, limit, true, area, industry, defaultAreas);
         break;
 
       case 'popular': // 高額補助
@@ -362,12 +406,13 @@ export async function GET(request: NextRequest) {
           limit,
           true,
           area,
-          industry
+          industry,
+          defaultAreas
         );
         break;
 
       case 'new': // 新着
-        subsidies = await getSubsidies('created_at', false, undefined, limit, true, area, industry);
+        subsidies = await getSubsidies('created_at', false, undefined, limit, true, area, industry, defaultAreas);
         break;
 
       case 'highrate': // 高補助率
@@ -378,7 +423,8 @@ export async function GET(request: NextRequest) {
           limit,
           true,
           area,
-          industry
+          industry,
+          defaultAreas
         );
         break;
 
@@ -416,7 +462,8 @@ export async function GET(request: NextRequest) {
           aiDxCount,
           true,
           area,
-          industry
+          industry,
+          defaultAreas
         );
 
         const seenAll = new Set<string>(aiDxSubsidies.map(s => s.id));
@@ -431,13 +478,13 @@ export async function GET(request: NextRequest) {
         const excludeIdsAll = [...seenAll];
         const [deadline, recent, ended] = await Promise.all([
           deadlineCount > 0
-            ? getSubsidies('end_date', true, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, deadlineCount, true, area, industry)
+            ? getSubsidies('end_date', true, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, deadlineCount, true, area, industry, defaultAreas)
             : Promise.resolve([] as Subsidy[]),
           recentCount > 0
-            ? getSubsidies('created_at', false, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, recentCount, true, area, industry)
+            ? getSubsidies('created_at', false, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, recentCount, true, area, industry, defaultAreas)
             : Promise.resolve([] as Subsidy[]),
           endedSlots > 0
-            ? getSubsidies('updated_at', false, excludeIdsAll.length > 0 ? (q) => q.eq('is_active', false).not('id', 'in', `(${excludeIdsAll.join(',')})`) : (q) => q.eq('is_active', false), endedSlots, false, area, industry)
+            ? getSubsidies('updated_at', false, excludeIdsAll.length > 0 ? (q) => q.eq('is_active', false).not('id', 'in', `(${excludeIdsAll.join(',')})`) : (q) => q.eq('is_active', false), endedSlots, false, area, industry, defaultAreas)
             : Promise.resolve([] as Subsidy[]),
         ]);
 
@@ -451,15 +498,19 @@ export async function GET(request: NextRequest) {
         subsidies = aiDxSubsidies.slice(0, limit);
         break;
       }
-    }
+      }
 
-    return NextResponse.json({
-      subsidies,
-      category,
-      area,
-      industry,
-      activeOnly: category === 'all' ? activeOnlyForAll : true,
+      return {
+        subsidies,
+        category,
+        area: area || (useDefaultAreas ? '東京都・埼玉県' : '全国'),
+        industry,
+        activeOnly: category === 'all' ? activeOnlyForAll : true,
+        filteredByDefault: useDefaultAreas,
+      };
     });
+
+    return NextResponse.json(result);
   } catch (e) {
     console.error('API error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

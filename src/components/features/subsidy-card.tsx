@@ -23,8 +23,10 @@ export function SubsidyCard({ subsidy, variant = 'default', enableSwipe = true }
   const router = useRouter();
   const { isFavorite, toggleFavorite } = useFavorites();
   const daysRemaining = getDaysRemaining(subsidy.end_date);
-  // is_activeがfalseの場合は強制的にclosed、それ以外は締切日ベースのステータス
-  const status = subsidy.is_active === false ? 'closed' : getDeadlineStatus(daysRemaining);
+  // タイトルに「募集終了」「募集は終了」などが含まれている場合も募集終了として表示
+  const titleIndicatesClosed = /募集.{0,2}終了|受付.{0,2}終了|申請.{0,2}終了/.test(subsidy.title);
+  // is_activeがfalseの場合、またはタイトルが終了を示している場合は強制的にclosed
+  const status = subsidy.is_active === false || titleIndicatesClosed ? 'closed' : getDeadlineStatus(daysRemaining);
   const isFav = isFavorite(subsidy.id);
 
   // スワイプハンドラー

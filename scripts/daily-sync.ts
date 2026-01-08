@@ -20,6 +20,7 @@ import {
   DEEP_CRAWL_CONFIG,
 } from './crawler/config/daily-targets';
 import { createDeepCrawler, DEEP_CRAWL_TARGETS } from './scrapers/deep-crawler';
+import { invalidateCache } from '../src/lib/cache';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -52,8 +53,8 @@ const POPULAR_SUBSIDIES = [
     industry: ['製造業', 'サービス業', '全業種'],
     max_amount: 40000000,
     subsidy_rate: '1/2〜2/3',
-    start_date: '2025-01-10',
-    end_date: '2025-03-31',
+    start_date: '2026-01-10',
+    end_date: '2026-03-31',
     front_url: 'https://portal.monodukuri-hojo.jp/',
     is_active: true,
   },
@@ -75,8 +76,8 @@ const POPULAR_SUBSIDIES = [
     industry: ['全業種'],
     max_amount: 4500000,
     subsidy_rate: '1/2〜3/4',
-    start_date: '2025-02-01',
-    end_date: '2025-12-31',
+    start_date: '2026-01-01',
+    end_date: '2026-12-31',
     front_url: 'https://it-shien.smrj.go.jp/',
     is_active: true,
   },
@@ -98,8 +99,8 @@ const POPULAR_SUBSIDIES = [
     industry: ['全業種'],
     max_amount: 2000000,
     subsidy_rate: '2/3',
-    start_date: '2025-01-15',
-    end_date: '2025-06-30',
+    start_date: '2026-01-15',
+    end_date: '2026-06-30',
     front_url: 'https://r3.jizokukahojokin.info/',
     is_active: true,
   },
@@ -121,8 +122,8 @@ const POPULAR_SUBSIDIES = [
     industry: ['製造業', '飲食業', '宿泊業', '小売業', '全業種'],
     max_amount: 15000000,
     subsidy_rate: '1/2',
-    start_date: '2025-01-20',
-    end_date: '2025-09-30',
+    start_date: '2026-01-20',
+    end_date: '2026-09-30',
     front_url: 'https://shoryokuka.smrj.go.jp/',
     is_active: true,
   },
@@ -144,8 +145,8 @@ const POPULAR_SUBSIDIES = [
     industry: ['全業種'],
     max_amount: 6000000,
     subsidy_rate: '1/2〜2/3',
-    start_date: '2025-02-01',
-    end_date: '2025-12-31',
+    start_date: '2026-01-01',
+    end_date: '2026-12-31',
     front_url: 'https://jsh.go.jp/',
     is_active: true,
   },
@@ -278,6 +279,40 @@ async function runDeepCrawl() {
   }
 }
 
+async function deactivateExpiredSubsidies() {
+  console.log('\n⏰ 期限切れ・募集終了チェック中...');
+  
+  const today = new Date().toISOString().split('T')[0];
+  
+  // 1. 期限が過ぎているものを非アクティブ化
+  const { data: expired, error: err1 } = await supabase
+    .from('subsidies')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('is_active', true)
+    .lt('end_date', today)
+    .select('id');
+  
+  if (err1) {
+    console.error('   期限切れチェックエラー:', err1.message);
+  } else {
+    console.log(`   ✓ 期限切れ: ${expired?.length || 0}件を非アクティブ化`);
+  }
+
+  // 2. タイトルに「募集終了」等が含まれるものを非アクティブ化
+  const { data: titleEnded, error: err2 } = await supabase
+    .from('subsidies')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('is_active', true)
+    .or('title.ilike.%募集終了%,title.ilike.%受付終了%,title.ilike.%申請終了%,title.ilike.%募集は終了%,title.ilike.%受付は終了%')
+    .select('id');
+  
+  if (err2) {
+    console.error('   タイトルチェックエラー:', err2.message);
+  } else {
+    console.log(`   ✓ タイトルに終了含む: ${titleEnded?.length || 0}件を非アクティブ化`);
+  }
+}
+
 async function cleanupDuplicates() {
   console.log('\n🧹 重複データをクリーンアップ中...');
   
@@ -340,6 +375,26 @@ async function cleanupDuplicates() {
   }
 }
 
+/**
+ * Redisキャッシュを無効化
+ * データ更新後にキャッシュをクリアして最新データを反映
+ */
+async function clearCache() {
+  console.log('\n🗑️ キャッシュをクリア中...');
+  
+  try {
+    const deletedCount = await invalidateCache();
+    if (deletedCount > 0) {
+      console.log(`   ✓ ${deletedCount}件のキャッシュをクリア`);
+    } else {
+      console.log('   ✓ キャッシュなし（または未設定）');
+    }
+  } catch (error) {
+    // キャッシュクリアの失敗は致命的ではないので続行
+    console.warn('   ⚠️ キャッシュクリアをスキップ:', error instanceof Error ? error.message : error);
+  }
+}
+
 async function main() {
   const startTime = new Date();
   console.log('='.repeat(60));
@@ -357,8 +412,14 @@ async function main() {
     // 3. ディープクロール実行（曜日別ターゲット）
     await runDeepCrawl();
 
-    // 4. 重複クリーンアップ
+    // 4. 期限切れ・募集終了チェック
+    await deactivateExpiredSubsidies();
+
+    // 5. 重複クリーンアップ
     await cleanupDuplicates();
+
+    // 6. キャッシュをクリア（Redisが設定されている場合）
+    await clearCache();
 
     const endTime = new Date();
     const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);

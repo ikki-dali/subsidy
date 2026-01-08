@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   // Rate Limiting
   const ip = getClientIp(request);
-  const rateLimit = checkRateLimit(ip, '/api/auth/reset-password');
+  const rateLimit = await checkRateLimit(ip, '/api/auth/reset-password');
 
   if (!rateLimit.success) {
     return NextResponse.json(

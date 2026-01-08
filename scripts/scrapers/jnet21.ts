@@ -254,10 +254,14 @@ export class JNet21Scraper extends BaseScraper {
 
   /**
    * 詳細ページから追加情報を取得
+   * 重要: 元ソースURL（公式サイト）を抽出し、source_urlを更新する
    */
   async fetchDetail(subsidy: ScrapedSubsidy): Promise<void> {
     try {
-      const response = await this.fetchWithTimeout(subsidy.source_url, {
+      // J-Net21のURLを保存
+      const jnet21Url = subsidy.source_url;
+      
+      const response = await this.fetchWithTimeout(jnet21Url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; SubsidyBot/1.0)',
         },
@@ -267,6 +271,41 @@ export class JNet21Scraper extends BaseScraper {
 
       const html = await response.text();
       const $ = cheerio.load(html);
+
+      // ★重要: 「詳細情報を見る」セクションから元ソースURLを抽出
+      let originalSourceUrl: string | undefined;
+      
+      // 方法1: h2「詳細情報を見る」の次のaタグ
+      const detailSection = $('h2:contains("詳細情報を見る")');
+      if (detailSection.length > 0) {
+        const nextLink = detailSection.next('a').attr('href');
+        if (nextLink && nextLink.startsWith('http')) {
+          originalSourceUrl = nextLink;
+        }
+      }
+      
+      // 方法2: 詳細情報セクション内のリンク
+      if (!originalSourceUrl) {
+        $('a[target="_blank"]').each((_, el) => {
+          const href = $(el).attr('href');
+          // J-Net21以外の外部リンクを探す
+          if (href && href.startsWith('http') && 
+              !href.includes('j-net21.smrj.go.jp') && 
+              !href.includes('smrj.go.jp/org') &&
+              !href.includes('facebook.com') &&
+              !href.includes('twitter.com')) {
+            originalSourceUrl = href;
+            return false; // break
+          }
+        });
+      }
+      
+      // 元ソースURLが見つかった場合、URLを更新
+      if (originalSourceUrl) {
+        subsidy.original_source_url = originalSourceUrl;
+        subsidy.aggregator_url = jnet21Url;
+        subsidy.source_url = originalSourceUrl; // メインURLを元ソースに変更
+      }
 
       // 詳細説明を取得（J-Net21の構造に合わせて修正）
       // 「実施機関からのお知らせ」セクションのテキストを取得

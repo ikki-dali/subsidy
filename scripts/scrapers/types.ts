@@ -4,7 +4,11 @@ export type ScrapedSubsidy = {
   // 識別子
   source: string;           // データソース（'mirasapo', 'jnet21', 'tokyo', etc.）
   source_id: string;        // ソース内でのユニークID
-  source_url: string;       // 元ページURL
+  source_url: string;       // 元ページURL（公式サイト優先）
+  
+  // 元ソース追跡用（J-Net21等のアグリゲーター用）
+  original_source_url?: string;  // 元の公式サイトURL
+  aggregator_url?: string;       // アグリゲーター（J-Net21等）のURL
 
   // 基本情報
   title: string;

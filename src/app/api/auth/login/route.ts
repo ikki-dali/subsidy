@@ -10,7 +10,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export async function POST(request: NextRequest) {
   // Rate Limiting
   const ip = getClientIp(request);
-  const rateLimit = checkRateLimit(ip, '/api/auth/login');
+  const rateLimit = await checkRateLimit(ip, '/api/auth/login');
   
   if (!rateLimit.success) {
     return NextResponse.json(

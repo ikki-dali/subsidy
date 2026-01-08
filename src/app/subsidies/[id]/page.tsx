@@ -68,8 +68,11 @@ export default async function SubsidyDetailPage({ params }: Props) {
   }
 
   const daysRemaining = getDaysRemaining(subsidy.end_date);
-  // is_active=false の場合は募集終了として表示
-  const status = subsidy.is_active === false ? 'closed' : getDeadlineStatus(daysRemaining);
+  
+  // タイトルに「募集終了」「募集は終了」などが含まれている場合も募集終了として表示
+  const titleIndicatesClosed = /募集.{0,2}終了|受付.{0,2}終了|申請.{0,2}終了/.test(subsidy.title);
+  // is_active=false の場合、またはタイトルが終了を示している場合は募集終了として表示
+  const status = subsidy.is_active === false || titleIndicatesClosed ? 'closed' : getDeadlineStatus(daysRemaining);
 
   const statusConfig = {
     urgent: {

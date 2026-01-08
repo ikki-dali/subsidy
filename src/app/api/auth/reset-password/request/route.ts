@@ -22,7 +22,7 @@ export const runtime = 'nodejs';
 export async function POST(request: NextRequest) {
   // Rate Limiting
   const ip = getClientIp(request);
-  const rateLimit = checkRateLimit(ip, '/api/auth/reset-password/request');
+  const rateLimit = await checkRateLimit(ip, '/api/auth/reset-password/request');
 
   if (!rateLimit.success) {
     return NextResponse.json(

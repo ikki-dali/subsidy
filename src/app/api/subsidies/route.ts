@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getRateLimitHeaders, getClientIp } from '@/lib/rate-limit';
+import { getCachedSearchResults } from '@/lib/cache';
 
 function sanitizeOrFilterValue(value: string, maxLength = 100): string {
   // PostgREST の `or()` フィルタ文字列注入を避けるため、予約文字を除去
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   // Rate Limiting（公開API）
   const ip = getClientIp(request);
-  const rateLimit = checkRateLimit(ip, request.nextUrl.pathname);
+  const rateLimit = await checkRateLimit(ip, request.nextUrl.pathname);
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: 'リクエストが多すぎます。しばらくしてからお試しください。' },
@@ -63,105 +64,120 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let query = supabase
-      .from('subsidies')
-      .select('*', { count: 'exact' });
+    // キャッシュキー用のパラメータ
+    const cacheParams = {
+      keyword: keyword || null,
+      area: area || null,
+      industry: industry || null,
+      minAmount,
+      maxAmount,
+      sort: sortBy,
+      active: activeOnly ? 'true' : null,
+      limit: String(limit),
+      offset: String(offset),
+    };
 
-    // 募集中のみフィルター
-    if (activeOnly) {
-      query = query.eq('is_active', true);
-      // 締切日が未来または未設定のものを取得
-      const today = new Date().toISOString().split('T')[0];
-      query = query.or(`end_date.gte.${today},end_date.is.null`);
-    }
+    // キャッシュ付きでデータを取得
+    const result = await getCachedSearchResults(cacheParams, async () => {
+      let query = supabase
+        .from('subsidies')
+        .select('*', { count: 'exact' });
 
-    // キーワード検索（タイトルとキャッチフレーズと説明文）
-    if (keyword) {
-      query = query.or(
-        `title.ilike.%${keyword}%,catch_phrase.ilike.%${keyword}%,description.ilike.%${keyword}%`
-      );
-    }
-
-    // 地域フィルター（指定地域 + 全国対象の補助金を表示）
-    // target_areaはtext[]配列なので、overlaps (ov) オペレータを使用
-    if (area && area !== '全国') {
-      // 指定地域または全国を含むものを表示
-      query = query.filter('target_area', 'ov', `{${area},全国}`);
-    }
-
-    // 業種フィルター（配列カラムでフィルタリング）
-    // JSONB配列なので、cs (contains) オペレータにはJSON配列構文を使用
-    if (industry) {
-      if (industry === '全業種') {
-        // 全業種タグを持つもの、またはタグが空/nullのものを表示
-        query = query.or('industry.cs.["全業種"],industry.is.null,industry.eq.[]');
-      } else {
-        // 指定業種を含む、または全業種タグを持つものを表示
-        const safeIndustry = escapeForPostgrestJsonString(industry);
-        query = query.or(`industry.cs.["${safeIndustry}"],industry.cs.["全業種"]`);
+      // 募集中のみフィルター
+      if (activeOnly) {
+        query = query.eq('is_active', true);
+        // 締切日が未来または未設定のものを取得
+        const today = new Date().toISOString().split('T')[0];
+        query = query.or(`end_date.gte.${today},end_date.is.null`);
       }
-    }
 
-    // 金額範囲フィルター（max_amountがnullでないレコードのみ）
-    if (minAmount || maxAmount) {
-      // まずmax_amountがnullでないことを確認
-      query = query.not('max_amount', 'is', null);
+      // キーワード検索（タイトルとキャッチフレーズと説明文）
+      if (keyword) {
+        query = query.or(
+          `title.ilike.%${keyword}%,catch_phrase.ilike.%${keyword}%,description.ilike.%${keyword}%`
+        );
+      }
+
+      // 地域フィルター（指定地域 + 全国対象の補助金を表示）
+      // target_areaはtext[]配列なので、overlaps (ov) オペレータを使用
+      if (area && area !== '全国') {
+        // 指定地域または全国を含むものを表示
+        query = query.filter('target_area', 'ov', `{${area},全国}`);
+      }
+
+      // 業種フィルター（配列カラムでフィルタリング）
+      // JSONB配列なので、cs (contains) オペレータにはJSON配列構文を使用
+      if (industry) {
+        if (industry === '全業種') {
+          // 全業種タグを持つもの、またはタグが空/nullのものを表示
+          query = query.or('industry.cs.["全業種"],industry.is.null,industry.eq.[]');
+        } else {
+          // 指定業種を含む、または全業種タグを持つものを表示
+          const safeIndustry = escapeForPostgrestJsonString(industry);
+          query = query.or(`industry.cs.["${safeIndustry}"],industry.cs.["全業種"]`);
+        }
+      }
+
+      // 金額範囲フィルター（max_amountがnullでないレコードのみ）
+      if (minAmount || maxAmount) {
+        // まずmax_amountがnullでないことを確認
+        query = query.not('max_amount', 'is', null);
+        
+        if (minAmount) {
+          const min = parseInt(minAmount, 10);
+          if (!isNaN(min)) {
+            query = query.gte('max_amount', min);
+          }
+        }
+        if (maxAmount) {
+          const max = parseInt(maxAmount, 10);
+          if (!isNaN(max)) {
+            query = query.lte('max_amount', max);
+          }
+        }
+      }
+
+      // ソート（募集中を優先）
+      // まずis_activeでソート（trueが先）
+      query = query.order('is_active', { ascending: false });
       
-      if (minAmount) {
-        const min = parseInt(minAmount, 10);
-        if (!isNaN(min)) {
-          query = query.gte('max_amount', min);
-        }
+      switch (sortBy) {
+        case 'deadline':
+          query = query.order('end_date', { ascending: true, nullsFirst: false });
+          break;
+        case 'amount_desc':
+          query = query.order('max_amount', { ascending: false, nullsFirst: true });
+          break;
+        case 'amount_asc':
+          query = query.order('max_amount', { ascending: true, nullsFirst: true });
+          break;
+        case 'newest':
+          query = query.order('updated_at', { ascending: false });
+          break;
+        default:
+          query = query.order('end_date', { ascending: true, nullsFirst: false });
       }
-      if (maxAmount) {
-        const max = parseInt(maxAmount, 10);
-        if (!isNaN(max)) {
-          query = query.lte('max_amount', max);
-        }
+
+      // ページネーション
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('Supabase error:', error);
+        console.error('Query params:', { keyword, area, industry, minAmount, maxAmount, sortBy, activeOnly, limit, offset });
+        throw error;
       }
-    }
 
-    // ソート（募集中を優先）
-    // まずis_activeでソート（trueが先）
-    query = query.order('is_active', { ascending: false });
-    
-    switch (sortBy) {
-      case 'deadline':
-        query = query.order('end_date', { ascending: true, nullsFirst: false });
-        break;
-      case 'amount_desc':
-        query = query.order('max_amount', { ascending: false, nullsFirst: true });
-        break;
-      case 'amount_asc':
-        query = query.order('max_amount', { ascending: true, nullsFirst: true });
-        break;
-      case 'newest':
-        query = query.order('updated_at', { ascending: false });
-        break;
-      default:
-        query = query.order('end_date', { ascending: true, nullsFirst: false });
-    }
-
-    // ページネーション
-    query = query.range(offset, offset + limit - 1);
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Supabase error:', error);
-      console.error('Query params:', { keyword, area, industry, minAmount, maxAmount, sortBy, activeOnly, limit, offset });
-      return NextResponse.json({ 
-        error: error.message,
-        details: process.env.NODE_ENV === 'development' ? error : undefined
-      }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      subsidies: data || [],
-      total: count || 0,
-      limit,
-      offset,
+      return {
+        subsidies: data || [],
+        total: count || 0,
+        limit,
+        offset,
+      };
     });
+
+    return NextResponse.json(result);
   } catch (e) {
     console.error('API error:', e);
     return NextResponse.json({ 

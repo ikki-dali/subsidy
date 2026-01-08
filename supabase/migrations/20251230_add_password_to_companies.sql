@@ -7,3 +7,4 @@ ALTER TABLE companies
 COMMENT ON COLUMN companies.password_hash IS 'bcryptハッシュ化されたパスワード';
 
 
+
