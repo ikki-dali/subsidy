@@ -22,11 +22,11 @@ export const metadata: Metadata = {
       process.env.NEXT_PUBLIC_APP_URL ||
       "http://localhost:3000"
   ),
-  title: "補助金ナビ - あなたに最適な補助金を発見",
-  description: "全国の補助金・助成金情報を一元検索。地域・業種・金額から、あなたに合った支援制度を見つけましょう。",
-  keywords: ["補助金", "助成金", "支援金", "中小企業", "事業支援", "申請", "検索"],
-  authors: [{ name: "補助金ナビ" }],
-  creator: "補助金ナビ",
+  title: "足立区補助金ナビ - 足立区で使える補助金・助成金を発見",
+  description: "足立区の中小企業・個人事業主向け補助金・助成金情報を一元検索。足立区独自の補助金から国・東京都の支援制度まで、あなたに合った支援を見つけましょう。",
+  keywords: ["足立区", "補助金", "助成金", "支援金", "中小企業", "事業支援", "申請", "検索", "東京都"],
+  authors: [{ name: "足立区補助金ナビ" }],
+  creator: "足立区補助金ナビ",
   icons: {
     icon: [
       { url: "/icon.ico", sizes: "32x32" },
@@ -36,16 +36,16 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "補助金ナビ - あなたに最適な補助金を発見",
-    description: "全国の補助金・助成金情報を一元検索。地域・業種・金額から、あなたに合った支援制度を見つけましょう。",
+    title: "足立区補助金ナビ - 足立区で使える補助金・助成金を発見",
+    description: "足立区の中小企業・個人事業主向け補助金・助成金情報を一元検索。足立区独自の補助金から国・東京都の支援制度まで。",
     type: "website",
     locale: "ja_JP",
-    siteName: "補助金ナビ",
+    siteName: "足立区補助金ナビ",
   },
   twitter: {
     card: "summary_large_image",
-    title: "補助金ナビ - あなたに最適な補助金を発見",
-    description: "全国の補助金・助成金情報を一元検索",
+    title: "足立区補助金ナビ - 足立区で使える補助金・助成金を発見",
+    description: "足立区の補助金・助成金情報を一元検索",
   },
   robots: {
     index: true,

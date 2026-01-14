@@ -14,15 +14,6 @@ function sanitizeOrFilterValue(value: string, maxLength = 100): string {
     .slice(0, maxLength);
 }
 
-function sanitizePgArrayElement(value: string, maxLength = 50): string {
-  // `filter(..., 'ov', '{a,b}')` の配列リテラルに埋め込むため、危険文字を除去
-  // 対象は都道府県名などを想定
-  return value
-    .replace(/[\0\r\n]+/g, ' ')
-    .replace(/[^0-9A-Za-zぁ-んァ-ン一-龯々〆〤ー・]/g, '')
-    .slice(0, maxLength);
-}
-
 function escapeForPostgrestJsonString(value: string, maxLength = 200): string {
   // `industry.cs.["..."]` に埋め込むため、JSON文字列として壊れないようにエスケープ
   return value
@@ -37,8 +28,11 @@ export async function GET(request: NextRequest) {
   
   // 検索パラメータ
   const keyword = sanitizeOrFilterValue(searchParams.get('keyword') || '', 100);
-  const area = sanitizePgArrayElement(searchParams.get('area') || '', 50);
+  // 足立区特化: 地域フィルターはデフォルトで足立区・東京都・全国
   const industry = sanitizeOrFilterValue(searchParams.get('industry') || '', 100);
+  // MECE分類: 実施主体フィルター (adachi, tokyo, national, other, all)
+  const sourceRaw = searchParams.get('source') || 'all';
+  const source = ['adachi', 'tokyo', 'national', 'other', 'all'].includes(sourceRaw) ? sourceRaw : 'all';
   const minAmount = searchParams.get('minAmount');
   const maxAmount = searchParams.get('maxAmount');
   const sortByRaw = searchParams.get('sort') || 'deadline';
@@ -64,10 +58,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // キャッシュキー用のパラメータ
+    // キャッシュキー用のパラメータ（足立区特化: 地域は固定）
     const cacheParams = {
       keyword: keyword || null,
-      area: area || null,
+      area: 'adachi', // 足立区特化のキャッシュキー
+      source, // MECE分類: 実施主体
       industry: industry || null,
       minAmount,
       maxAmount,
@@ -98,12 +93,43 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // 地域フィルター（指定地域 + 全国対象の補助金を表示）
-      // target_areaはtext[]配列なので、overlaps (ov) オペレータを使用
-      if (area && area !== '全国') {
-        // 指定地域または全国を含むものを表示
-        query = query.filter('target_area', 'ov', `{${area},全国}`);
+      // MECE分類: 実施主体別フィルター
+      // target_areaはtext[]配列なので、contains (cs) と overlaps (ov) を使用
+      switch (source) {
+        case 'adachi':
+          // 足立区: target_areaに「足立区」を含む
+          query = query.contains('target_area', ['足立区']);
+          break;
+        case 'tokyo':
+          // 東京都: target_areaに「東京都」を含む AND 「足立区」を含まない
+          query = query.contains('target_area', ['東京都']);
+          query = query.not('target_area', 'cs', '{足立区}');
+          break;
+        case 'national':
+          // 国（全国）: target_areaに「全国」を含む AND 「足立区」「東京都」を含まない
+          query = query.contains('target_area', ['全国']);
+          query = query.not('target_area', 'cs', '{足立区}');
+          query = query.not('target_area', 'cs', '{東京都}');
+          break;
+        case 'other':
+          // その他: 足立区、東京都、全国のいずれも含まない
+          query = query.not('target_area', 'ov', '{足立区,東京都,全国}');
+          break;
+        case 'all':
+        default:
+          // 全て: 足立区・東京都・全国対象の補助金を表示
+          query = query.filter('target_area', 'ov', '{足立区,東京都,全国}');
+          break;
       }
+
+      // セミナー・説明会・相談会系を除外
+      query = query
+        .not('title', 'ilike', '%セミナー%')
+        .not('title', 'ilike', '%説明会%')
+        .not('title', 'ilike', '%相談会%')
+        .not('title', 'ilike', '%勉強会%')
+        .not('title', 'ilike', '%講座%')
+        .not('title', 'ilike', '%研修%');
 
       // 業種フィルター（配列カラムでフィルタリング）
       // JSONB配列なので、cs (contains) オペレータにはJSON配列構文を使用
@@ -165,13 +191,47 @@ export async function GET(request: NextRequest) {
 
       if (error) {
         console.error('Supabase error:', error);
-        console.error('Query params:', { keyword, area, industry, minAmount, maxAmount, sortBy, activeOnly, limit, offset });
+        console.error('Query params:', { keyword, industry, minAmount, maxAmount, sortBy, activeOnly, limit, offset });
         throw error;
       }
 
+      // AI/IT/DX関連を優先表示（スコアリング）- 明確なキーワードのみ
+      const AI_PRIORITY_KEYWORDS = [
+        'AI', '人工知能', '生成AI', 'ChatGPT', '機械学習',
+        'DX', 'IT導入', 'IT補助', 'ICT', 'デジタル化',
+        'RPA', 'クラウド', 'SaaS', 'IoT',
+        'テレワーク', 'EC構築', 'ホームページ', 'Webサイト', 'ECサイト',
+        'サイバーセキュリティ', 'OCR', 'チャットボット',
+      ];
+
+      const getAiScore = (subsidy: { title?: string | null; catch_phrase?: string | null }) => {
+        const text = `${subsidy.title || ''} ${subsidy.catch_phrase || ''}`.toLowerCase();
+        let score = 0;
+        for (const kw of AI_PRIORITY_KEYWORDS) {
+          if (text.includes(kw.toLowerCase())) {
+            score += 10;
+          }
+        }
+        return score;
+      };
+
+      // セミナー系をJavaScriptでも除外（DBクエリで漏れる場合の保険）
+      const SEMINAR_KEYWORDS = ['セミナー', '説明会', '相談会', '勉強会', '講座', '研修'];
+      const filteredData = (data || []).filter((item) => {
+        const title = item.title || '';
+        return !SEMINAR_KEYWORDS.some(kw => title.includes(kw));
+      });
+
+      // AI関連スコアで並び替え（同スコア内は元の順序を維持）
+      const sortedData = [...filteredData].sort((a, b) => {
+        const scoreA = getAiScore(a);
+        const scoreB = getAiScore(b);
+        return scoreB - scoreA; // スコア高い順
+      });
+
       return {
-        subsidies: data || [],
-        total: count || 0,
+        subsidies: sortedData,
+        total: count || 0, // 元の件数を維持（セミナー除外前）
         limit,
         offset,
       };

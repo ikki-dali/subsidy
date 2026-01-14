@@ -53,6 +53,49 @@ function normalizeIndustry(industry: string): string[] {
   return mapping[industry] || [industry];
 }
 
+// MECE分類: 実施主体フィルター (adachi, tokyo, national, other, all)
+type SourceType = 'adachi' | 'tokyo' | 'national' | 'other' | 'all';
+
+// セミナー・説明会・相談会系を除外
+function excludeSeminars(
+  query: ReturnType<typeof supabase.from>
+): ReturnType<typeof supabase.from> {
+  return query
+    .not('title', 'ilike', '%セミナー%')
+    .not('title', 'ilike', '%説明会%')
+    .not('title', 'ilike', '%相談会%')
+    .not('title', 'ilike', '%勉強会%')
+    .not('title', 'ilike', '%講座%')
+    .not('title', 'ilike', '%研修%');
+}
+
+// sourceパラメータに基づくクエリフィルタを適用
+function applySourceFilter(
+  query: ReturnType<typeof supabase.from>,
+  source: SourceType
+): ReturnType<typeof supabase.from> {
+  switch (source) {
+    case 'adachi':
+      // 足立区: target_areaに「足立区」を含む
+      return query.contains('target_area', ['足立区']);
+    case 'tokyo':
+      // 東京都: target_areaに「東京都」を含む AND 「足立区」を含まない
+      return query.contains('target_area', ['東京都']).not('target_area', 'cs', '{足立区}');
+    case 'national':
+      // 国（全国）: target_areaに「全国」を含む AND 「足立区」「東京都」を含まない
+      return query.contains('target_area', ['全国'])
+        .not('target_area', 'cs', '{足立区}')
+        .not('target_area', 'cs', '{東京都}');
+    case 'other':
+      // その他: 足立区、東京都、全国のいずれも含まない
+      return query.not('target_area', 'ov', '{足立区,東京都,全国}');
+    case 'all':
+    default:
+      // 全て: 足立区・東京都・全国対象の補助金を表示
+      return query.filter('target_area', 'ov', '{足立区,東京都,全国}');
+  }
+}
+
 async function getSubsidies(
   orderBy: string,
   ascending: boolean,
@@ -61,29 +104,38 @@ async function getSubsidies(
   onlyActive = true, // true: 募集中のみ / false: 募集終了も含む
   area?: string, // 地域フィルタ（単一）
   industry?: string, // 業種フィルタ
-  areas?: string[] // 地域フィルタ（複数、東京・埼玉デフォルト用）
+  areas?: string[], // 地域フィルタ（複数、東京・埼玉デフォルト用）
+  source?: SourceType // MECE分類: 実施主体フィルター
 ): Promise<Subsidy[]> {
   const now = new Date().toISOString();
-  const hasAreaFilter = area && area !== '全国';
-  const hasAreasFilter = areas && areas.length > 0;
+  // sourceが指定されている場合はMECE分類を使用（area/areasより優先）
+  const hasSourceFilter = source !== undefined;
+  const hasAreaFilter = !hasSourceFilter && area && area !== '全国';
+  const hasAreasFilter = !hasSourceFilter && areas && areas.length > 0;
   const hasIndustryFilter = industry && industry !== 'その他' && industry !== 'other';
-  
+
   // フィルタが指定されている場合は、優先度付きで取得
-  if (hasAreaFilter || hasAreasFilter || hasIndustryFilter) {
+  if (hasSourceFilter || hasAreaFilter || hasAreasFilter || hasIndustryFilter) {
     const results: Subsidy[] = [];
     const seenIds = new Set<string>();
     
-    // 複数地域フィルタの場合、各地域でOR検索
-    const buildAreaQuery = (q: ReturnType<typeof supabase.from>) => {
+    // sourceフィルターまたは地域フィルタを適用 + セミナー除外
+    const buildBaseQuery = (q: ReturnType<typeof supabase.from>) => {
+      // セミナー系を除外
+      const filtered = excludeSeminars(q);
+      // sourceフィルターが指定されている場合はMECE分類を適用
+      if (hasSourceFilter) {
+        return applySourceFilter(filtered, source);
+      }
       if (hasAreaFilter) {
-        return q.contains('target_area', [area]);
+        return filtered.contains('target_area', [area]);
       }
       if (hasAreasFilter) {
         // 複数地域: いずれかに該当（OR条件）
         const areaFilters = areas!.map(a => `target_area.cs.["${a}"]`).join(',');
-        return q.or(areaFilters);
+        return filtered.or(areaFilters);
       }
-      return q;
+      return filtered;
     };
     
     // 1. まず地域と業種両方にマッチする補助金を取得
@@ -92,7 +144,7 @@ async function getSubsidies(
         .from('subsidies')
         .select('*');
       
-      query = buildAreaQuery(query);
+      query = buildBaseQuery(query);
       
       // 業種フィルタ（JGSONBの配列内検索）
       const industryVariants = normalizeIndustry(industry);
@@ -129,7 +181,7 @@ async function getSubsidies(
         .from('subsidies')
         .select('*');
       
-      query = buildAreaQuery(query);
+      query = buildBaseQuery(query);
 
       if (onlyActive) {
         query = query.eq('is_active', true);
@@ -214,13 +266,27 @@ async function getSubsidies(
       }
     }
 
-    return results.slice(0, limit);
+    // セミナー系をJavaScriptでも除外（DBクエリで漏れる場合の保険）
+    const SEMINAR_KEYWORDS_FILTER = ['セミナー', '説明会', '相談会', '勉強会', '講座', '研修'];
+    const filteredResults = results.filter((item) => {
+      const title = item.title || '';
+      return !SEMINAR_KEYWORDS_FILTER.some(kw => title.includes(kw));
+    });
+    return filteredResults.slice(0, limit);
   }
 
-  // フィルタ指定がない場合は従来通り
+  // フィルタ指定がない場合でもsourceフィルターとセミナー除外は適用
   let query = supabase
     .from('subsidies')
     .select('*');
+
+  // セミナー系を除外
+  query = excludeSeminars(query);
+
+  // sourceフィルターを適用（MECE分類）
+  if (hasSourceFilter) {
+    query = applySourceFilter(query, source);
+  }
 
   if (onlyActive) {
     query = query.eq('is_active', true);
@@ -235,27 +301,40 @@ async function getSubsidies(
 
   const { data } = await query
     .order(orderBy, { ascending })
-    .limit(limit);
+    .limit(limit * 2); // セミナー除外で減る分を考慮して多めに取得
 
-  return (data || []) as Subsidy[];
+  // セミナー系をJavaScriptでも除外（DBクエリで漏れる場合の保険）
+  const SEMINAR_KEYWORDS = ['セミナー', '説明会', '相談会', '勉強会', '講座', '研修'];
+  const filtered = (data || []).filter((item: Subsidy) => {
+    const title = item.title || '';
+    return !SEMINAR_KEYWORDS.some(kw => title.includes(kw));
+  });
+
+  return filtered.slice(0, limit) as Subsidy[];
 }
 
-// 東京・埼玉特化: デフォルトで東京都・埼玉県のみ表示
-const DEFAULT_AREAS = ['東京都', '埼玉県'];
+// 足立区特化: デフォルトで足立区・東京都・全国のみ表示
+const DEFAULT_AREAS = ['足立区', '東京都', '全国'];
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const category = searchParams.get('category') || 'all';
   const limit = parseInt(searchParams.get('limit') || '6', 10);
-  
-  // 地域フィルタ: デフォルトは東京・埼玉
+
+  // MECE分類: 実施主体フィルター (adachi, tokyo, national, other, all)
+  const sourceRaw = searchParams.get('source');
+  const source: SourceType | undefined = sourceRaw && ['adachi', 'tokyo', 'national', 'other', 'all'].includes(sourceRaw)
+    ? (sourceRaw as SourceType)
+    : undefined;
+
+  // 地域フィルタ: sourceが指定されていない場合のみ使用
   // area=all で全国表示、area=東京都 で東京のみ、など
   const areaParam = searchParams.get('area');
-  const area = areaParam === 'all' ? undefined : (areaParam || undefined);
-  
-  // 地域が指定されていない場合、東京・埼玉をデフォルトにする
-  const useDefaultAreas = !areaParam;
-  
+  const area = source ? undefined : (areaParam === 'all' ? undefined : (areaParam || undefined));
+
+  // sourceが指定されている場合はデフォルト地域を使わない
+  const useDefaultAreas = !source && !areaParam;
+
   const industry = searchParams.get('industry') || undefined;
   // category=all のときのみ有効: active=true で募集中のみ
   const activeOnlyForAll = searchParams.get('active') === 'true';
@@ -281,7 +360,8 @@ export async function GET(request: NextRequest) {
     const cacheParams = {
       category,
       limit: String(limit),
-      area: area || (useDefaultAreas ? 'tokyo-saitama' : null),
+      source: source || null, // MECE分類
+      area: area || (useDefaultAreas ? 'adachi-tokyo' : null),
       industry: industry || null,
       active: activeOnlyForAll ? 'true' : null,
     };
@@ -310,7 +390,7 @@ export async function GET(request: NextRequest) {
         }
 
         // 2) 自動判定（募集中のみ）で残りを補完
-        // AI/IT/DX系キーワード（効率化・省力化系も含む）
+        // AI/IT/DX系キーワード（明確なものだけ）
         const AI_DX_KEYWORDS = [
           // AI系
           'AI',
@@ -325,12 +405,6 @@ export async function GET(request: NextRequest) {
           'ICT',
           'デジタル化',
           'デジタルトランスフォーメーション',
-          // 効率化・省力化系
-          '効率化',
-          '省力化',
-          '省人化',
-          '自動化',
-          '業務改善',
           // ツール・サービス系
           'RPA',
           'クラウド',
@@ -339,21 +413,14 @@ export async function GET(request: NextRequest) {
           'IoT',
           'OCR',
           'チャットボット',
-          'ロボット',
           // 働き方系
           'テレワーク',
           'リモートワーク',
-          'BCP',
           // Web系
           'EC構築',
           'ホームページ',
           'Webサイト',
           'ECサイト',
-          // システム系
-          'システム導入',
-          'システム構築',
-          '基幹システム',
-          '情報システム',
         ] as const;
 
         // タイトルとキャッチフレーズのみで判定（業種タグは全業種向け補助金で誤マッチするため除外）
@@ -379,7 +446,8 @@ export async function GET(request: NextRequest) {
           true,
           area,
           industry,
-          defaultAreas
+          defaultAreas,
+          source
         );
 
         // 重複を除去（ピン→自動の順で並べる）
@@ -395,7 +463,7 @@ export async function GET(request: NextRequest) {
       }
 
       case 'deadline': // 締切間近
-        subsidies = await getSubsidies('end_date', true, undefined, limit, true, area, industry, defaultAreas);
+        subsidies = await getSubsidies('end_date', true, undefined, limit, true, area, industry, defaultAreas, source);
         break;
 
       case 'popular': // 高額補助
@@ -407,12 +475,13 @@ export async function GET(request: NextRequest) {
           true,
           area,
           industry,
-          defaultAreas
+          defaultAreas,
+          source
         );
         break;
 
       case 'new': // 新着
-        subsidies = await getSubsidies('created_at', false, undefined, limit, true, area, industry, defaultAreas);
+        subsidies = await getSubsidies('created_at', false, undefined, limit, true, area, industry, defaultAreas, source);
         break;
 
       case 'highrate': // 高補助率
@@ -424,28 +493,25 @@ export async function GET(request: NextRequest) {
           true,
           area,
           industry,
-          defaultAreas
+          defaultAreas,
+          source
         );
         break;
 
       default: { // all: AI/IT/DX優先 + 各カテゴリから取得してマージ
         // AI/IT/DX系を常に上位に出す（サイトのコンセプト）
-        // タイトルとキャッチフレーズのキーワードのみで判定（業種タグは全業種向け補助金で誤マッチするため除外）
+        // タイトルとキャッチフレーズのキーワードのみで判定（明確なものだけ）
         const AI_DX_KEYWORDS_ALL = [
           // AI系
           'AI', '人工知能', '生成AI', 'ChatGPT', '機械学習',
           // DX・デジタル系
           'DX', 'IT導入', 'IT補助', 'ICT', 'デジタル化', 'デジタルトランスフォーメーション',
-          // 効率化・省力化系
-          '効率化', '省力化', '省人化', '自動化', '業務改善',
           // ツール・サービス系
-          'RPA', 'クラウド', 'SaaS', 'サイバーセキュリティ', 'IoT', 'OCR', 'チャットボット', 'ロボット',
+          'RPA', 'クラウド', 'SaaS', 'サイバーセキュリティ', 'IoT', 'OCR', 'チャットボット',
           // 働き方系
-          'テレワーク', 'リモートワーク', 'BCP',
+          'テレワーク', 'リモートワーク',
           // Web系
           'EC構築', 'ホームページ', 'Webサイト', 'ECサイト',
-          // システム系
-          'システム導入', 'システム構築', '基幹システム', '情報システム',
         ];
         const keywordFiltersAll = AI_DX_KEYWORDS_ALL.flatMap((kw) => [
           `title.ilike.%${kw}%`,
@@ -463,7 +529,8 @@ export async function GET(request: NextRequest) {
           true,
           area,
           industry,
-          defaultAreas
+          defaultAreas,
+          source
         );
 
         const seenAll = new Set<string>(aiDxSubsidies.map(s => s.id));
@@ -478,13 +545,13 @@ export async function GET(request: NextRequest) {
         const excludeIdsAll = [...seenAll];
         const [deadline, recent, ended] = await Promise.all([
           deadlineCount > 0
-            ? getSubsidies('end_date', true, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, deadlineCount, true, area, industry, defaultAreas)
+            ? getSubsidies('end_date', true, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, deadlineCount, true, area, industry, defaultAreas, source)
             : Promise.resolve([] as Subsidy[]),
           recentCount > 0
-            ? getSubsidies('created_at', false, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, recentCount, true, area, industry, defaultAreas)
+            ? getSubsidies('created_at', false, excludeIdsAll.length > 0 ? (q) => q.not('id', 'in', `(${excludeIdsAll.join(',')})`) : undefined, recentCount, true, area, industry, defaultAreas, source)
             : Promise.resolve([] as Subsidy[]),
           endedSlots > 0
-            ? getSubsidies('updated_at', false, excludeIdsAll.length > 0 ? (q) => q.eq('is_active', false).not('id', 'in', `(${excludeIdsAll.join(',')})`) : (q) => q.eq('is_active', false), endedSlots, false, area, industry, defaultAreas)
+            ? getSubsidies('updated_at', false, excludeIdsAll.length > 0 ? (q) => q.eq('is_active', false).not('id', 'in', `(${excludeIdsAll.join(',')})`) : (q) => q.eq('is_active', false), endedSlots, false, area, industry, defaultAreas, source)
             : Promise.resolve([] as Subsidy[]),
         ]);
 
@@ -503,10 +570,11 @@ export async function GET(request: NextRequest) {
       return {
         subsidies,
         category,
-        area: area || (useDefaultAreas ? '東京都・埼玉県' : '全国'),
+        source: source || null, // MECE分類: 実施主体
+        area: area || (useDefaultAreas ? '足立区・東京都' : '全国'),
         industry,
         activeOnly: category === 'all' ? activeOnlyForAll : true,
-        filteredByDefault: useDefaultAreas,
+        filteredByDefault: useDefaultAreas && !source,
       };
     });
 

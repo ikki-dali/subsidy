@@ -18,7 +18,6 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet';
 import {
-  MapPin,
   Building2,
   Banknote,
   TrendingUp,
@@ -26,17 +25,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 
-// 都道府県リスト
-const PREFECTURES = [
-  '全国', '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
-  '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
-  '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県',
-  '岐阜県', '静岡県', '愛知県', '三重県',
-  '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県',
-  '鳥取県', '島根県', '岡山県', '広島県', '山口県',
-  '徳島県', '香川県', '愛媛県', '高知県',
-  '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
-];
+// 足立区特化サイト - 地域フィルターは削除
 
 // 業種リスト（tag-industries.tsのカテゴリと一致）
 const INDUSTRIES = [
@@ -75,9 +64,7 @@ const SORT_OPTIONS = [
 type MobileFilterSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // フィルター値
-  area: string;
-  setArea: (area: string) => void;
+  // フィルター値（足立区特化: 地域フィルターは削除）
   industry: string;
   setIndustry: (industry: string) => void;
   amountRange: string;
@@ -86,8 +73,6 @@ type MobileFilterSheetProps = {
   setSortBy: (sortBy: string) => void;
   activeOnly: boolean;
   setActiveOnly: (active: boolean) => void;
-  // ユーザー設定
-  userPrefecture: string | null;
   // アクション
   onApply: () => void;
   onClear: () => void;
@@ -98,8 +83,6 @@ type MobileFilterSheetProps = {
 export function MobileFilterSheet({
   open,
   onOpenChange,
-  area,
-  setArea,
   industry,
   setIndustry,
   amountRange,
@@ -108,7 +91,6 @@ export function MobileFilterSheet({
   setSortBy,
   activeOnly,
   setActiveOnly,
-  userPrefecture,
   onApply,
   onClear,
   resultCount,
@@ -144,32 +126,7 @@ export function MobileFilterSheet({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-          {/* 地域 */}
-          <div className="space-y-3">
-            <Label className="text-sm font-semibold flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-green-100">
-                <MapPin className="h-4 w-4 text-green-600" />
-              </div>
-              対象地域
-            </Label>
-            <Select value={area} onValueChange={setArea}>
-              <SelectTrigger className="h-12 rounded-xl text-base">
-                <SelectValue placeholder="すべての地域" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[40vh]">
-                {userPrefecture && (
-                  <SelectItem value={userPrefecture} className="font-medium text-green-700 bg-green-50 h-12">
-                    ⭐ {userPrefecture}（あなたの地域）
-                  </SelectItem>
-                )}
-                {PREFECTURES.filter(p => p !== userPrefecture).map((pref) => (
-                  <SelectItem key={pref} value={pref} className="h-12">
-                    {pref}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* 足立区特化: 地域フィルターは削除 */}
 
           {/* 業種 */}
           <div className="space-y-3">

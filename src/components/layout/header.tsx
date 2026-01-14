@@ -26,8 +26,8 @@ export function Header() {
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
           </div>
-          <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-            補助金ナビ
+          <span className="text-base sm:text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+            足立区補助金ナビ
           </span>
         </Link>
         {/* デスクトップ用ナビ - モバイルではBottomNavを使用 */}

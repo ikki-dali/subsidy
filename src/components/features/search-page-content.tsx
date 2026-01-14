@@ -18,11 +18,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SubsidyCard } from '@/components/features/subsidy-card';
 import { Header } from '@/components/layout/header';
 import { MobileFilterSheet } from '@/components/features/mobile-filter-sheet';
-import { 
-  Search, 
-  X, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
   SlidersHorizontal,
   MapPin,
   Building2,
@@ -33,6 +33,10 @@ import {
   LayoutGrid,
   List,
   History,
+  Landmark,
+  Building,
+  Globe,
+  Users,
 } from 'lucide-react';
 import type { Subsidy } from '@/types/database';
 
@@ -42,17 +46,16 @@ type SearchHistoryItem = {
   searched_at: string;
 };
 
-// 都道府県リスト
-const PREFECTURES = [
-  '全国', '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
-  '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
-  '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県',
-  '岐阜県', '静岡県', '愛知県', '三重県',
-  '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県',
-  '鳥取県', '島根県', '岡山県', '広島県', '山口県',
-  '徳島県', '香川県', '愛媛県', '高知県',
-  '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
-];
+// 足立区特化サイト - 地域フィルターは削除（API側で足立区対応補助金のみを返す）
+
+// MECE分類: 実施主体別タブ（相互排他的・網羅的）
+const SOURCE_TABS = [
+  { value: 'all', label: 'すべて', icon: Globe, color: 'blue' },
+  { value: 'adachi', label: '足立区', icon: MapPin, color: 'green' },
+  { value: 'tokyo', label: '東京都', icon: Building, color: 'purple' },
+  { value: 'national', label: '国', icon: Landmark, color: 'amber' },
+  { value: 'other', label: 'その他', icon: Users, color: 'slate' },
+] as const;
 
 // 業種リスト（tag-industries.tsのカテゴリと一致）
 const INDUSTRIES = [
@@ -116,15 +119,15 @@ export function SearchPageContent() {
   // Cookie読み込み完了フラグ
   const [initialized, setInitialized] = useState(false);
 
-  // 検索条件（URLパラメータがなければCookieから取得）
+  // 検索条件（URLパラメータがなければデフォルト）
   const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
-  const [area, setArea] = useState(searchParams.get('area') || '');
+  // MECE分類: 実施主体フィルター
+  const [source, setSource] = useState(searchParams.get('source') || 'all');
   const [industry, setIndustry] = useState(searchParams.get('industry') || '');
   const [amountRange, setAmountRange] = useState(searchParams.get('amount') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'deadline');
   const [activeOnly, setActiveOnly] = useState(searchParams.get('active') !== 'false');
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10));
-  const [userPrefecture, setUserPrefecture] = useState<string | null>(null);
   
   // UI状態
   const [showFilters, setShowFilters] = useState(false);
@@ -145,18 +148,10 @@ export function SearchPageContent() {
 
   const limit = 12;
 
-  // 初回ロード時にCookieからユーザーの都道府県を取得
+  // 足立区特化: 初期化のみ
   useEffect(() => {
-    const prefecture = getCookie('company_prefecture');
-    if (prefecture) {
-      setUserPrefecture(prefecture);
-      // URLパラメータに地域指定がなければ、ユーザーの都道府県をデフォルトに
-      if (!searchParams.get('area')) {
-        setArea(prefecture);
-      }
-    }
     setInitialized(true);
-  }, [searchParams]);
+  }, []);
 
   // 検索履歴を取得
   useEffect(() => {
@@ -206,7 +201,7 @@ export function SearchPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keyword: searchKeyword,
-          filters: { area, industry, amountRange },
+          filters: { industry, amountRange },
         }),
       });
       // 履歴を更新
@@ -239,7 +234,8 @@ export function SearchPageContent() {
 
     const params = new URLSearchParams();
     if (keyword) params.set('keyword', keyword);
-    if (area && area !== '全国') params.set('area', area);
+    // MECE分類: 実施主体フィルター
+    if (source && source !== 'all') params.set('source', source);
     if (industry) params.set('industry', industry);
     if (activeOnly) params.set('active', 'true');
     if (sortBy) params.set('sort', sortBy);
@@ -270,7 +266,7 @@ export function SearchPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [keyword, area, industry, amountRange, sortBy, activeOnly, page, initialized]);
+  }, [keyword, source, industry, amountRange, sortBy, activeOnly, page, initialized]);
 
   // 初回・条件変更時に検索
   useEffect(() => {
@@ -281,7 +277,8 @@ export function SearchPageContent() {
   const updateUrl = useCallback(() => {
     const params = new URLSearchParams();
     if (keyword) params.set('keyword', keyword);
-    if (area) params.set('area', area);
+    // MECE分類: 実施主体フィルター
+    if (source && source !== 'all') params.set('source', source);
     if (industry) params.set('industry', industry);
     if (amountRange) params.set('amount', amountRange);
     if (sortBy !== 'deadline') params.set('sort', sortBy);
@@ -290,7 +287,7 @@ export function SearchPageContent() {
 
     const queryString = params.toString();
     router.push(`/search${queryString ? `?${queryString}` : ''}`, { scroll: false });
-  }, [keyword, area, industry, amountRange, sortBy, activeOnly, page, router]);
+  }, [keyword, source, industry, amountRange, sortBy, activeOnly, page, router]);
 
   // 検索ボタン押下
   const handleSearch = () => {
@@ -317,7 +314,7 @@ export function SearchPageContent() {
   // フィルタークリア
   const clearFilters = () => {
     setKeyword('');
-    setArea('');
+    setSource('all'); // MECE分類もリセット
     setIndustry('');
     setAmountRange('');
     setSortBy('deadline');
@@ -326,13 +323,19 @@ export function SearchPageContent() {
     router.push('/search');
   };
 
+  // タブ切り替え時の処理
+  const handleSourceChange = (newSource: string) => {
+    setSource(newSource);
+    setPage(1);
+  };
+
   const totalPages = Math.ceil(total / limit);
-  const hasFilters = keyword || area || industry || amountRange || !activeOnly;
-  
+  const hasFilters = keyword || source !== 'all' || industry || amountRange || !activeOnly;
+
   // アクティブなフィルター数
   const activeFilterCount = [
     keyword,
-    area && area !== '全国' ? area : null,
+    source !== 'all', // MECE分類
     industry,
     amountRange,
     !activeOnly,
@@ -344,6 +347,34 @@ export function SearchPageContent() {
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* MECE分類タブ */}
+        <div className="mb-4 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-2 min-w-max sm:min-w-0 sm:flex-wrap">
+            {SOURCE_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = source === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => handleSourceChange(tab.value)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                    isActive
+                      ? tab.color === 'blue' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' :
+                        tab.color === 'green' ? 'bg-green-600 text-white shadow-lg shadow-green-500/25' :
+                        tab.color === 'purple' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25' :
+                        tab.color === 'amber' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25' :
+                        'bg-slate-600 text-white shadow-lg shadow-slate-500/25'
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* メイン検索エリア */}
         <div className="bg-white rounded-2xl shadow-lg border p-4 sm:p-6 mb-6">
           {/* 検索バー */}
@@ -447,34 +478,8 @@ export function SearchPageContent() {
           {/* 拡張フィルター */}
           {showFilters && (
             <div className="mt-6 pt-6 border-t border-slate-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 地域 */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-green-600" />
-                    対象地域
-                    {userPrefecture && area === userPrefecture && (
-                      <Badge className="text-[10px] bg-green-100 text-green-700 border-green-200">あなたの地域</Badge>
-                    )}
-                  </Label>
-                  <Select value={area} onValueChange={setArea}>
-                    <SelectTrigger className="rounded-lg">
-                      <SelectValue placeholder="すべての地域" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {userPrefecture && (
-                        <SelectItem value={userPrefecture} className="font-medium text-green-700 bg-green-50">
-                          ⭐ {userPrefecture}（あなたの地域）
-                        </SelectItem>
-                      )}
-                      {PREFECTURES.filter(p => p !== userPrefecture).map((pref) => (
-                        <SelectItem key={pref} value={pref}>
-                          {pref}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 足立区特化: 地域フィルターは削除 */}
 
                 {/* 業種 */}
                 <div className="space-y-2">
@@ -595,12 +600,7 @@ export function SearchPageContent() {
                     {keyword.length > 10 ? keyword.slice(0, 10) + '...' : keyword}
                   </Badge>
                 )}
-                {area && area !== '全国' && (
-                  <Badge variant="secondary" className="bg-green-50 text-green-700 text-xs">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    {area}
-                  </Badge>
-                )}
+                {/* 足立区特化: 地域バッジは削除 */}
                 {industry && (
                   <Badge variant="secondary" className="bg-orange-50 text-orange-700 text-xs">
                     <Building2 className="h-3 w-3 mr-1" />
@@ -746,8 +746,7 @@ export function SearchPageContent() {
       <MobileFilterSheet
         open={mobileFilterOpen}
         onOpenChange={setMobileFilterOpen}
-        area={area}
-        setArea={setArea}
+        // 足立区特化: 地域フィルターは削除
         industry={industry}
         setIndustry={setIndustry}
         amountRange={amountRange}
@@ -756,7 +755,6 @@ export function SearchPageContent() {
         setSortBy={setSortBy}
         activeOnly={activeOnly}
         setActiveOnly={setActiveOnly}
-        userPrefecture={userPrefecture}
         onApply={handleSearch}
         onClear={clearFilters}
         resultCount={total}

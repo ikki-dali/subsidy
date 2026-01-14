@@ -51,16 +51,7 @@ const REVENUE_RANGES = [
   { value: 'over_1b', label: '10億円以上' },
 ];
 
-// 都道府県選択肢
-const PREFECTURES = [
-  '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
-  '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
-  '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
-  '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
-  '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
-  '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
-  '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
-];
+// 足立区特化サイト - 所在地は「東京都」固定
 
 // 補助金利用経験
 const SUBSIDY_EXPERIENCES = [
@@ -160,7 +151,7 @@ function OnboardingContent() {
     // Step 2: 規模情報
     employeeCount: '',
     annualRevenue: '',
-    prefecture: '',
+    prefecture: '東京都', // 足立区特化: 固定
     // Step 3: 補助金ニーズ
     subsidyExperience: '',
     subsidyPurposes: [] as string[],
@@ -214,10 +205,7 @@ function OnboardingContent() {
           setError('年商規模を選択してください');
           return false;
         }
-        if (!formData.prefecture) {
-          setError('所在地を選択してください');
-          return false;
-        }
+        // 足立区特化: 所在地バリデーションは削除（東京都固定）
         return true;
       case 3:
         if (!formData.subsidyExperience) {
@@ -366,12 +354,12 @@ function OnboardingContent() {
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
               <Banknote className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent tracking-tight">
-              補助金ナビ
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent tracking-tight">
+              足立区補助金ナビ
             </h1>
           </div>
           <p className="text-slate-500">
-            あなたの会社に最適な補助金をご提案します
+            足立区の事業者に最適な補助金をご提案します
           </p>
         </div>
 
@@ -532,26 +520,14 @@ function OnboardingContent() {
                   </Select>
                 </div>
 
+                {/* 足立区特化: 所在地は東京都固定（表示のみ） */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    所在地 <span className="text-red-500">*</span>
+                    所在地
                   </label>
-                  <Select value={formData.prefecture} onValueChange={(v) => updateFormData('prefecture', v)}>
-                    <SelectTrigger className="border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-blue-500">
-                      <SelectValue placeholder="都道府県を選択" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200 max-h-60 z-[100]">
-                      {PREFECTURES.map((pref) => (
-                        <SelectItem
-                          key={pref}
-                          value={pref}
-                          className="text-slate-700 focus:bg-blue-50 focus:text-blue-700"
-                        >
-                          {pref}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-slate-700">
+                    東京都足立区（対象エリア）
+                  </div>
                 </div>
               </div>
             </div>
@@ -818,7 +794,7 @@ function OnboardingContent() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">所在地</span>
-                    <span className="text-slate-900 font-medium">{formData.prefecture}</span>
+                    <span className="text-slate-900 font-medium">東京都（足立区）</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">補助金経験</span>

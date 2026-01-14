@@ -9,37 +9,51 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import Link from "next/link";
 import { AuthRequiredLink } from "@/components/features/auth-required-link";
 import { Suspense } from "react";
-import { 
-  Search, 
-  MapPin, 
-  Clock, 
-  Heart, 
-  TrendingUp, 
+import {
+  Search,
+  MapPin,
+  Clock,
+  Heart,
+  TrendingUp,
   Banknote,
   ArrowRight,
   Sparkles,
   Users,
   Shield,
+  Globe,
+  Building,
+  Landmark,
 } from "lucide-react";
 
 // ISRキャッシュ: 1時間ごとに再生成（補助金データは日次更新なので十分）
 export const revalidate = 3600;
 
-// 統計情報を取得
+// 統計情報を取得（足立区・東京都・全国対象のみ、セミナー系除外）
 async function getStats() {
   const today = new Date().toISOString().split('T')[0];
   const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  
+
+  // 足立区・東京都・全国対象のみを対象とするベースクエリ
+  const baseQuery = () => supabaseAdmin
+    .from('subsidies')
+    .select('*', { count: 'exact', head: true })
+    .filter('target_area', 'ov', '{足立区,東京都,全国}')
+    // セミナー・説明会・相談会系を除外
+    .not('title', 'ilike', '%セミナー%')
+    .not('title', 'ilike', '%説明会%')
+    .not('title', 'ilike', '%相談会%')
+    .not('title', 'ilike', '%勉強会%')
+    .not('title', 'ilike', '%講座%')
+    .not('title', 'ilike', '%研修%');
+
   const [totalResult, activeResult, urgentResult] = await Promise.all([
-    supabaseAdmin.from('subsidies').select('*', { count: 'exact', head: true }),
+    baseQuery(),
     // 募集中: end_date >= today OR end_date IS NULL（随時募集）
-    supabaseAdmin.from('subsidies')
-      .select('*', { count: 'exact', head: true })
+    baseQuery()
       .eq('is_active', true)
       .or(`end_date.gte.${today},end_date.is.null`),
     // 締切7日以内: end_dateが設定されていて7日以内
-    supabaseAdmin.from('subsidies')
-      .select('*', { count: 'exact', head: true })
+    baseQuery()
       .eq('is_active', true)
       .gte('end_date', today)
       .lte('end_date', sevenDaysLater),
@@ -77,20 +91,50 @@ export default async function Home() {
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="bg-white/20 text-white border-white/30 mb-6 px-4 py-1">
               <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-              全国{(Math.floor(stats.total / 100) * 100).toLocaleString()}件以上の補助金データ
+              足立区で使える補助金を{stats.total > 0 ? `${stats.total.toLocaleString()}件以上` : '多数'}収録
             </Badge>
-            
+
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
-              あなたの事業に<br />
-              <span className="text-blue-200">
-                最適な補助金
-              </span>を発見
+              <span className="text-blue-200">足立区</span>で使える<br />
+              補助金を発見
             </h1>
-            
+
             <p className="text-blue-100 text-lg md:text-xl mb-10 max-w-2xl mx-auto leading-relaxed">
-              全国の補助金・助成金情報を一元検索。
-              地域・業種・金額から、あなたに合った支援制度を見つけましょう。
+              足立区の中小企業・個人事業主向け補助金情報を一元検索。
+              足立区独自の補助金から国・東京都の支援制度まで、あなたに合った支援を見つけましょう。
             </p>
+
+            {/* 実施主体別クイックリンク */}
+            <div className="flex flex-wrap justify-center gap-2 mb-6">
+              <Link
+                href="/search?source=all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors border border-white/30"
+              >
+                <Globe className="h-4 w-4" />
+                すべて
+              </Link>
+              <Link
+                href="/search?source=adachi"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-500/30 hover:bg-emerald-500/40 text-white text-sm font-medium transition-colors border border-emerald-400/50"
+              >
+                <MapPin className="h-4 w-4" />
+                足立区
+              </Link>
+              <Link
+                href="/search?source=tokyo"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-purple-500/30 hover:bg-purple-500/40 text-white text-sm font-medium transition-colors border border-purple-400/50"
+              >
+                <Building className="h-4 w-4" />
+                東京都
+              </Link>
+              <Link
+                href="/search?source=national"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-500/30 hover:bg-amber-500/40 text-white text-sm font-medium transition-colors border border-amber-400/50"
+              >
+                <Landmark className="h-4 w-4" />
+                国
+              </Link>
+            </div>
 
             {/* 検索フォーム */}
             <div className="max-w-2xl mx-auto mb-12">
@@ -113,9 +157,9 @@ export default async function Home() {
               </div>
               <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
                 <div className="text-3xl font-bold text-emerald-300 mb-1">
-                  47
+                  3層
                 </div>
-                <div className="text-sm text-blue-200">都道府県対応</div>
+                <div className="text-sm text-blue-200">区・都・国対応</div>
               </div>
             </div>
           </div>
@@ -160,11 +204,11 @@ export default async function Home() {
                 <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center mb-4">
                   <MapPin className="h-6 w-6 text-white" />
                 </div>
-                <CardTitle className="text-lg">地域フィルター</CardTitle>
+                <CardTitle className="text-lg">足立区特化</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  全47都道府県の地方自治体補助金に対応。お住まいの地域で使える支援を見逃しません。
+                  足立区の補助金に特化。区独自の支援から国・都の全国対応補助金まで、漏れなくカバーします。
                 </p>
               </CardContent>
             </Card>
@@ -269,7 +313,7 @@ export default async function Home() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                 <Banknote className="h-4 w-4 text-white" />
               </div>
-              <span className="text-lg font-bold text-white">補助金ナビ</span>
+              <span className="text-lg font-bold text-white">足立区補助金ナビ</span>
             </div>
             
             <nav className="flex gap-6">
@@ -287,7 +331,7 @@ export default async function Home() {
           
           <div className="mt-8 pt-8 border-t border-slate-700 text-center">
             <p className="text-sm text-slate-500">
-              © 2024 補助金ナビ. All rights reserved.
+              © 2024 足立区補助金ナビ. All rights reserved.
             </p>
           </div>
         </div>
