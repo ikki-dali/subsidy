@@ -850,9 +850,9 @@ function OnboardingContent() {
         {/* フッター */}
         <p className="text-center text-slate-500 text-xs mt-6">
           登録することで、
-          <a href="#" className="text-blue-600 hover:underline">利用規約</a>
+          <Link href="/terms" className="text-blue-600 hover:underline">利用規約</Link>
           と
-          <a href="#" className="text-blue-600 hover:underline">プライバシーポリシー</a>
+          <Link href="/privacy" className="text-blue-600 hover:underline">プライバシーポリシー</Link>
           に同意したものとみなされます
         </p>
 
